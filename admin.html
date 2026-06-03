@@ -1,61 +1,66 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>宠物管理后台</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; background: #f9f9f9; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        input, textarea { width: 100%; margin-bottom: 15px; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; }
-        button { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .section { margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 10px; font-size: 0.9em; }
-    </style>
+    <title>管理後台</title>
 </head>
 <body>
-
-<div class="card">
-    <h3>宠物信息管理</h3>
-    <input type="text" id="pName" placeholder="宠物名字">
-    <input type="text" id="pPhone" placeholder="主人手机号码">
-    <input type="text" id="pPic" placeholder="照片链接">
-    <input type="text" id="barkKey" placeholder="Bark Key (通知金钥)">
+    <h2>寵物資料管理</h2>
+    <input type="text" id="name" placeholder="寵物名字" style="width:90%; padding:8px;"><br><br>
+    <input type="text" id="phone" placeholder="電話" style="width:90%; padding:8px;"><br><br>
     
-    <button onclick="saveData()">第二步：点此保存修改</button>
+    <label>選擇照片 (會自動轉為數據代碼):</label><br>
+    <input type="file" id="imageInput" accept="image/*" onchange="convert()">
+    <textarea id="photo" placeholder="照片數據" style="width:90%; height:60px; margin-top:5px;"></textarea><br><br>
+    
+    <button onclick="save()" style="padding:10px 20px; background:green; color:white; border:none;">💾 保存修改</button>
+    
+    <hr>
+    <h3>進階設定</h3>
+    <input type="text" id="binId" placeholder="JSONBin Bin ID" style="width:90%; padding:8px;"><br><br>
+    <input type="password" id="masterKey" placeholder="Master Key (安全性輸入)" style="width:90%; padding:8px;"><br><br>
+    <button onclick="load()">🔄 載入當前雲端資料</button>
 
-    <div class="section">
-        <p><strong>进阶核心设定 (客户平时勿动)</strong></p >
-        <input type="text" id="masterKey" placeholder="JSONBin Master Key">
-        <input type="text" id="binId" placeholder="JSONBin Bin ID">
-    </div>
-</div>
+    <script>
+        // 自動載入 ID
+        const params = new URLSearchParams(window.location.search);
+        document.getElementById('binId').value = params.get('id') || "";
 
-<script>
-    // 保存数据到 JSONbin
-    async function saveData() {
-        const binId = document.getElementById('binId').value;
-        const masterKey = document.getElementById('masterKey').value;
-        
-        const payload = {
-            petName: document.getElementById('pName').value,
-            petPhone: document.getElementById('pPhone').value,
-            petPic: document.getElementById('pPic').value,
-            barkKey: document.getElementById('barkKey').value
-        };
+        function convert() {
+            const file = document.getElementById('imageInput').files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => document.getElementById('photo').value = e.target.result;
+            reader.readAsDataURL(file);
+        }
 
-        try {
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+        async function save() {
+            const id = document.getElementById('binId').value;
+            const key = document.getElementById('masterKey').value;
+            const data = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                photo: document.getElementById('photo').value
+            };
+            const res = await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
                 method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'X-Master-Key': masterKey 
-                },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': key },
+                body: JSON.stringify(data)
             });
-            if(res.ok) alert('保存成功！');
-            else alert('保存失败，请检查 Key 或 ID');
-        } catch(e) { alert('网络故障'); }
-    }
-</script>
+            res.ok ? alert("保存成功！") : alert("保存失敗，請檢查 Key");
+        }
+
+        async function load() {
+            const id = document.getElementById('binId').value;
+            const key = document.getElementById('masterKey').value;
+            const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
+                headers: { 'X-Master-Key': key }
+            });
+            const data = await res.json();
+            document.getElementById('name').value = data.record.name;
+            document.getElementById('phone').value = data.record.phone;
+            document.getElementById('photo').value = data.record.photo;
+        }
+    </script>
 </body>
 </html>
