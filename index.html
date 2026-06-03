@@ -41,16 +41,15 @@
             const data = await response.json();
             const p = data.record;
             
-            // 匹配你后台的字段名：petName, petBreed, petStatus, petNotice, petPhone
-            document.getElementById('petName').innerText = p.petName || '未知';
+            document.getElementById('petName').innerText = p.petName || '无名';
             document.getElementById('petBreed').innerText = p.petBreed || '未知';
-            document.getElementById('petStatus').innerText = p.petStatus || '正常';
-            document.getElementById('petNotice').innerText = p.petNotice || '暂无寄语';
+            document.getElementById('petStatus').innerText = p.petStatus || '未知';
+            document.getElementById('petNotice').innerText = p.petNotice || '无';
             document.getElementById('btnContact').href = `tel:${p.petPhone}`;
             
             document.getElementById('loader').style.display = 'none';
             document.getElementById('content').style.display = 'block';
-        } catch (e) { alert('加载失败，请检查ID或网络'); }
+        } catch (e) { alert('加载失败，请检查ID是否正确'); }
     }
     loadData();
 </script>
