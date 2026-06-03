@@ -3,115 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>救救我，我走丟了！</title>
+    <title>智能寵物防丟系統</title>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f7f9fc; padding: 20px; color: #333; }
-        .card { background: white; border-radius: 15px; padding: 30px 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-top: 20px; }
+        .card { background: white; border-radius: 15px; padding: 30px 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 450px; margin: 20px auto; }
         img.pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 3px solid #eee; }
         h1 { color: #e74c3c; font-size: 24px; margin-bottom: 10px; }
         p { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
         .phone-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 18px; margin-bottom: 15px; width: 85%; box-sizing: border-box;}
         .location-btn { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; width: 85%; box-sizing: border-box; }
-        .admin-link { display: inline-block; margin-top: 30px; color: #b2bec3; font-size: 12px; text-decoration: none; }
+        
+        /* 表单样式 */
+        .form-section { display: none; text-align: left; }
+        .form-section h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; font-size: 20px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #34495e; font-size: 14px; }
+        input[type="text"], input[type="password"], textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .btn-submit { background: #2ecc71; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .hint { font-size: 12px; color: #7f8c8d; margin-top: -10px; margin-bottom: 12px; }
+        .admin-edit-btn { display: inline-block; margin-top: 25px; color: #cbd5e1; font-size: 11px; text-decoration: none; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <img id="petPic" src="https://images.unsplash.com/photo-1543466835-00a7907e9de1" alt="寵物照片" class="pet-pic">
-    <h1>我是 [<span id="petName">未啟用銘牌</span>] 🐶</h1>
-    <p id="petHint">如果您看到了這個頁面，說明我可能迷路了。<br>我的主人現在非常急切，請您幫幫我！</p>
-    
-    <a id="phoneBtn" href="javascript:void(0);" class="phone-btn" style="background:#bdc3c7;">📞 暫無主人電話</a>
+    <div id="displayMode">
+        <img id="petPic" src="" alt="寵物照片" class="pet-pic" style="display:none;">
+        <h1>我是 [<span id="petName">讀取中...</span>] 🐶</h1>
+        <p id="petHint">如果您看到了這個頁面，說明我可能迷路了。<br>我的主人現在非常急切，請您幫幫我！</p>
+        
+        <a id="phoneBtn" href="javascript:void(0);" class="phone-btn" style="background:#bdc3c7;">📞 暫無主人電話</a>
+        <button class="location-btn" onclick="sendLocation()" id="locBtn" disabled style="background:#bdc3c7;">📍 點擊將我的位置發給主人</button>
+        <p id="status-text" style="font-size: 12px; color: #7f8c8d; margin-top: 15px;">(正在從雲端載入資料...)</p>
+        
+        <span onclick="switchToRegister(true)" class="admin-edit-btn">⚙️ 主人修改資料設定</span>
+    </div>
 
-    <button class="location-btn" onclick="sendLocation()" id="locBtn" disabled style="background:#bdc3c7;">📍 點擊將我的位置發給主人</button>
-    <p id="status-text" style="font-size: 12px; color: #7f8c8d; margin-top: 15px;">(等待資料載入中...)</p>
-    
-    <a id="adminEntrance" href="#" class="admin-link">⚙️ 專屬主人初始化與資料修改設定</a>
+    <div id="registerMode" class="form-section">
+        <h2 id="formTitle">📝 寵物智能銘牌初始化登記</h2>
+        
+        <label>JSONBin Master Key (驗證密鑰)</label>
+        <input type="password" id="masterKey" placeholder="請輸入控制台的 Master Key">
+        
+        <label>寵物名字</label>
+        <input type="text" id="inputName" placeholder="例如：abu">
+
+        <label>主人手機號碼</label>
+        <input type="text" id="inputPhone" placeholder="例如：137XXXXXXXX">
+
+        <label>寵物照片 (直接選取手機相片)</label>
+        <input type="file" id="imageInput" accept="image/*" onchange="convertImageToBase64()">
+        <textarea id="inputPicUrl" placeholder="照片數據代碼（系統自動生成）" style="height: 50px;" readonly></textarea>
+        <div class="hint">💡 提示：直拍照片體積過大會儲存失敗，請使用截圖或壓縮在 100KB 內。</div>
+
+        <label>Bark Key (iPhone 實時報警金鑰，選填)</label>
+        <input type="text" id="inputBark" placeholder="請輸入 Bark App 金鑰">
+        <div class="hint">💡 綁定後，有人掃碼時會即時對您的 iPhone 進行彈窗報警與定位發送。</div>
+
+        <button class="btn-submit" onclick="saveData()">💾 儲存並啟用銘牌</button>
+        <button class="btn-submit" onclick="location.reload()" style="background:#95a5a6; margin-top: 10px;">🔙 返回展示頁面</button>
+    </div>
 </div>
 
 <script>
-    // ======================== ⚙️ 動態參數解析 ========================
     var urlParams = new URLSearchParams(window.location.search);
     var BIN_ID = urlParams.get('id'); 
-
+    
     var BARK_KEY = ''; 
-    var petName = '新銘牌';
+    var petName = '';
     var ownerPhone = '';
-    var petPicUrl = 'https://images.unsplash.com/photo-1543466835-00a7907e9de1';
+    var petPicUrl = '';
 
     window.onload = function() {
         if (!BIN_ID) {
-            document.getElementById('status-text').innerText = "⚠️ 錯誤：二維碼未綁定有效的元件ID！";
+            document.getElementById('status-text').innerText = "⚠️ 錯誤：網址未綁定有效的元件 ID！";
+            document.getElementById('petName').innerText = "未綁定";
             return;
         }
+        loadRemoteData();
+    };
 
-        // 绑定后台入口跳转链接
-        document.getElementById('adminEntrance').href = 'admin.html?id=' + BIN_ID;
-
-        // 使用 JSONBin 公开路径读取最新快照
+    // 从云端读取数据
+    function loadRemoteData() {
         var jsonUrl = 'https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest?nocache=' + Date.now();
-        var hasRendered = false;
-
-        var cloudTimeout = setTimeout(function() {
-            if (!hasRendered) { 
-                hasRendered = true; 
-                document.getElementById('status-text').innerText = "❌ 載入超時，請直接聯絡卡片上的備用電話。"; 
-            }
-        }, 5000);
-
-        fetch(jsonUrl, {
-            method: 'GET'
-        })
+        
+        // 由于需要判断是否为空，我们先嘗試匿名讀取快照
+        fetch(jsonUrl)
         .then(function(res) { return res.json(); })
         .then(function(resData) {
-            if (resData && !hasRendered) {
-                hasRendered = true; 
-                clearTimeout(cloudTimeout);
-                
-                var data = resData.record || resData; 
-                
-                // 数据字段映射绑定
-                if (data.petName) petName = data.petName;
-                if (data.ownerPhone) ownerPhone = data.ownerPhone;
-                if (data.petPicUrl) petPicUrl = data.petPicUrl; // 支持 Base64 编码大文本
-                if (data.barkKey) BARK_KEY = data.barkKey;
-                
-                document.getElementById('petName').innerText = petName;
-                document.getElementById('petPic').src = petPicUrl;
-                
-                if (ownerPhone) {
-                    var pBtn = document.getElementById('phoneBtn');
-                    pBtn.href = 'tel:' + ownerPhone;
-                    pBtn.innerText = '📞 撥打主人電話 (' + ownerPhone + ')';
-                    pBtn.style.background = '#2ecc71';
-                }
-                
-                if (BARK_KEY) {
-                    var lBtn = document.getElementById('locBtn');
-                    lBtn.disabled = false;
-                    lBtn.style.background = '#3498db';
-                    document.getElementById('status-text').innerText = "(為保護隱私，需要您允許獲取位置)";
-                    
-                    executeOnLoadNotify();
-                } else {
-                    document.getElementById('status-text').innerText = "💡 提示：該銘牌尚未啟用，請點擊下方連結初始化。";
-                }
+            var data = resData.record || resData;
+            
+            // 判断是不是空白新箱子，或者数据被设为了 undefined
+            if (!data || Object.keys(data).length === 0 || data.petName === "undefined" || !data.petName) {
+                // 进入首次扫描登记表单模式
+                switchToRegister(false);
+            } else {
+                // 已有数据，正常渲染精美防丢牌界面
+                renderDisplayPage(data);
             }
         })
         .catch(function(err) {
-            if (!hasRendered) { 
-                hasRendered = true; 
-                clearTimeout(cloudTimeout); 
-                document.getElementById('status-text').innerText = "❌ 讀取失敗。請確保雲端 JSONBin 的 Bin 設置為 Public 公開狀態！";
-            }
+            // 如果因为 Private 无法匿名读取，我们也直接判定需要引导或报错（通常新盒子默认是能读到初始化空结构的）
+            switchToRegister(false);
+            document.getElementById('formTitle').innerText = "⚙️ 驗證受阻，請輸入 Master Key 載入或初始化";
         });
-    };
+    }
 
+    // 渲染展示页面
+    function renderDisplayPage(data) {
+        petName = data.petName || "新銘牌";
+        ownerPhone = data.ownerPhone || "";
+        petPicUrl = data.petPicUrl || "";
+        BARK_KEY = data.barkKey || "";
+
+        document.getElementById('petName').innerText = petName;
+        
+        if (petPicUrl) {
+            var imgEl = document.getElementById('petPic');
+            imgEl.src = petPicUrl;
+            imgEl.style.display = "inline-block";
+        }
+        
+        if (ownerPhone) {
+            var pBtn = document.getElementById('phoneBtn');
+            pBtn.href = 'tel:' + ownerPhone;
+            pBtn.innerText = '📞 撥打主人電話 (' + ownerPhone + ')';
+            pBtn.style.background = '#2ecc71';
+        }
+        
+        if (BARK_KEY) {
+            var lBtn = document.getElementById('locBtn');
+            lBtn.disabled = false;
+            lBtn.style.background = '#3498db';
+            document.getElementById('status-text').innerText = "(為保護隱私，需要您允許獲取位置)";
+            executeOnLoadNotify();
+        } else {
+            document.getElementById('status-text').innerText = "💡 提示：此銘牌未綁定 Bark 自動報警功能。";
+        }
+    }
+
+    // 切换到登记/修改表单
+    function switchToRegister(isEdit) {
+        document.getElementById('displayMode').style.display = "none";
+        document.getElementById('registerMode').style.display = "block";
+        if (isEdit) {
+            document.getElementById('formTitle').innerText = "⚙️ 修改寵物防丟資料";
+            // 预填当前页面的基础文字（如果有的话）
+            document.getElementById('inputName').value = petName;
+            document.getElementById('inputPhone').value = ownerPhone;
+            document.getElementById('inputBark').value = BARK_KEY;
+            document.getElementById('inputPicUrl').value = petPicUrl;
+        }
+    }
+
+    // 图片转 Base64 逻辑
+    function convertImageToBase64() {
+        var file = document.getElementById('imageInput').files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('inputPicUrl').value = e.target.result;
+            alert("✅ 照片轉碼成功！");
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 保存/更新云端数据
+    async function saveData() {
+        var key = document.getElementById('masterKey').value.trim();
+        if (!key) {
+            alert("❌ 請輸入 JSONBin Master Key 以驗證您的主人身份！");
+            return;
+        }
+
+        var bodyData = {
+            petName: document.getElementById('inputName').value.trim(),
+            ownerPhone: document.getElementById('inputPhone').value.trim(),
+            petPicUrl: document.getElementById('inputPicUrl').value.trim(),
+            barkKey: document.getElementById('inputBark').value.trim()
+        };
+
+        if (!bodyData.petName || !bodyData.ownerPhone) {
+            alert("❌ 寵物名字與主人電話為必填項！");
+            return;
+        }
+
+        try {
+            var response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': key
+                },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (response.ok) {
+                alert("🎉 銘牌啟用/修改成功！即將刷新頁面看效果。");
+                location.reload();
+            } else {
+                alert("❌ 保存失敗，請檢查您的 Master Key 是否正確，或照片是否過大。");
+            }
+        } catch (e) {
+            alert("❌ 出錯了：" + e.message);
+        }
+    }
+
+    // Bark 异步静默通知
     function executeOnLoadNotify() {
         if(!BARK_KEY) return;
-        var title = encodeURIComponent('👀 有人辨識了 ' + petName + ' 的防丟牌！');
-        var body = encodeURIComponent('好心人已打開網頁頁面。請保持電話暢通，或等待對方共享精確位置。');
+        var title = encodeURIComponent('👀 有人掃描了 ' + petName + ' 的防丟牌！');
+        var body = encodeURIComponent('對方已打開網頁。請保持手機暢通，或等待對方共享精確定位。');
         new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + title + '/' + body + '?sound=anticipate';
     }
 
@@ -153,17 +254,16 @@
                 var corrected = wgs84ToGcj02(rawLon, rawLat);
                 var lon = corrected[0], lat = corrected[1];
                 
-                // 拼接高德地图与苹果内置地图通用坐标串
-                var mapUrl = 'https://maps.apple.com/?ll=' + lat + ',' + lon + '&q=' + encodeURIComponent(petName + '被開啟位置');
-                var title = encodeURIComponent('⚠️ 緊急：' + petName + '的精確定位已被共享！');
-                var body = encodeURIComponent('好心人共享了即時位置。點擊此通知直接喚起地圖導航查看！');
+                var mapUrl = 'https://maps.apple.com/?ll=' + lat + ',' + lon + '&q=' + encodeURIComponent(petName + '被掃描位置');
+                var title = encodeURIComponent('⚠️ 緊急：' + petName + '的精確位置已被共享！');
+                var body = encodeURIComponent('好心人共享了即時坐標。點擊此處直接打開地圖導航尋找！');
                 
                 new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + title + '/' + body + '?url=' + encodeURIComponent(mapUrl) + '&sound=alarm';
                 statusText.innerText = "✅ 位置已成功發送！非常感謝您的善舉！";
                 statusText.style.color = "#27ae60"; btn.innerText = "發送成功";
             }, function(error) {
                 statusText.innerText = "❌ 獲取位置失敗，請直接撥打電話聯繫主人。";
-                new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('⚠️ 有人掃碼但未獲取到定位') + '/' + encodeURIComponent('對方拒絕了地理位置權限或GPS定位超時。');
+                new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('⚠️ 有人掃碼但拒絕共享位置') + '/' + encodeURIComponent('對方未授權GPS權限或獲取超時。');
             }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
         }
     }
