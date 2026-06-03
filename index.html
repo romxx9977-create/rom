@@ -10,8 +10,8 @@
         img.pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 3px solid #eee; }
         h1 { color: #e74c3c; font-size: 24px; margin-bottom: 10px; }
         p { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
-        .phone-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 18px; margin-bottom: 15px; width: 80%; box-sizing: border-box;}
-        .location-btn { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; width: 80%; box-sizing: border-box; }
+        .phone-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 18px; margin-bottom: 15px; width: 85%; box-sizing: border-box;}
+        .location-btn { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; width: 85%; box-sizing: border-box; }
         .admin-link { display: inline-block; margin-top: 30px; color: #b2bec3; font-size: 12px; text-decoration: none; }
     </style>
 </head>
@@ -35,9 +35,6 @@
     var urlParams = new URLSearchParams(window.location.search);
     var BIN_ID = urlParams.get('id'); 
 
-    // 💡 提示：如果你的 JSONBin 設置為 Public，這裡可以留空，更安全！
-    var MASTER_KEY = 'YOUR_MASTER_KEY_HERE'; 
-
     var BARK_KEY = ''; 
     var petName = '新銘牌';
     var ownerPhone = '';
@@ -49,9 +46,10 @@
             return;
         }
 
+        // 绑定后台入口跳转链接
         document.getElementById('adminEntrance').href = 'admin.html?id=' + BIN_ID;
 
-        // 使用 JSONBin 公開路徑（如果是 Private 請確保上方填寫了 MASTER_KEY）
+        // 使用 JSONBin 公开路径读取最新快照
         var jsonUrl = 'https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest?nocache=' + Date.now();
         var hasRendered = false;
 
@@ -62,14 +60,8 @@
             }
         }, 5000);
 
-        var headers = {};
-        if (MASTER_KEY && MASTER_KEY !== 'YOUR_MASTER_KEY_HERE') {
-            headers['X-Master-Key'] = MASTER_KEY;
-        }
-
         fetch(jsonUrl, {
-            method: 'GET',
-            headers: headers
+            method: 'GET'
         })
         .then(function(res) { return res.json(); })
         .then(function(resData) {
@@ -79,10 +71,10 @@
                 
                 var data = resData.record || resData; 
                 
+                // 数据字段映射绑定
                 if (data.petName) petName = data.petName;
                 if (data.ownerPhone) ownerPhone = data.ownerPhone;
-                // 完美兼容 Base64 長代碼圖片或普通網址
-                if (data.petPicUrl) petPicUrl = data.petPicUrl;
+                if (data.petPicUrl) petPicUrl = data.petPicUrl; // 支持 Base64 编码大文本
                 if (data.barkKey) BARK_KEY = data.barkKey;
                 
                 document.getElementById('petName').innerText = petName;
@@ -94,6 +86,7 @@
                     pBtn.innerText = '📞 撥打主人電話 (' + ownerPhone + ')';
                     pBtn.style.background = '#2ecc71';
                 }
+                
                 if (BARK_KEY) {
                     var lBtn = document.getElementById('locBtn');
                     lBtn.disabled = false;
@@ -110,15 +103,15 @@
             if (!hasRendered) { 
                 hasRendered = true; 
                 clearTimeout(cloudTimeout); 
-                document.getElementById('status-text').innerText = "❌ 讀取失敗，請確認元件 ID 是否在該帳號下。";
+                document.getElementById('status-text').innerText = "❌ 讀取失敗。請確保雲端 JSONBin 的 Bin 設置為 Public 公開狀態！";
             }
         });
     };
 
     function executeOnLoadNotify() {
         if(!BARK_KEY) return;
-        var title = encodeURIComponent('👀 有人掃描了' + petName + '的防丟牌！');
-        var body = encodeURIComponent('對方已打開頁面。請保持電話暢通，或等待對方共享精確位置。');
+        var title = encodeURIComponent('👀 有人辨識了 ' + petName + ' 的防丟牌！');
+        var body = encodeURIComponent('好心人已打開網頁頁面。請保持電話暢通，或等待對方共享精確位置。');
         new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + title + '/' + body + '?sound=anticipate';
     }
 
@@ -144,4 +137,36 @@
         var radLat = lat / 180.0 * Math.PI, magic = Math.sin(radLat);
         magic = 1 - ee * magic * magic; var sqrtMagic = Math.sqrt(magic);
         dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
-        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.
+        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+        return [lng + dLng, lat + dLat];
+    }
+
+    function sendLocation() {
+        if(!BARK_KEY) return;
+        var btn = document.getElementById('locBtn');
+        var statusText = document.getElementById('status-text');
+        btn.innerText = "正在獲取位置..."; btn.disabled = true;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var rawLat = position.coords.latitude; var rawLon = position.coords.longitude;
+                var corrected = wgs84ToGcj02(rawLon, rawLat);
+                var lon = corrected[0], lat = corrected[1];
+                
+                // 拼接高德地图与苹果内置地图通用坐标串
+                var mapUrl = 'https://maps.apple.com/?ll=' + lat + ',' + lon + '&q=' + encodeURIComponent(petName + '被開啟位置');
+                var title = encodeURIComponent('⚠️ 緊急：' + petName + '的精確定位已被共享！');
+                var body = encodeURIComponent('好心人共享了即時位置。點擊此通知直接喚起地圖導航查看！');
+                
+                new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + title + '/' + body + '?url=' + encodeURIComponent(mapUrl) + '&sound=alarm';
+                statusText.innerText = "✅ 位置已成功發送！非常感謝您的善舉！";
+                statusText.style.color = "#27ae60"; btn.innerText = "發送成功";
+            }, function(error) {
+                statusText.innerText = "❌ 獲取位置失敗，請直接撥打電話聯繫主人。";
+                new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('⚠️ 有人掃碼但未獲取到定位') + '/' + encodeURIComponent('對方拒絕了地理位置權限或GPS定位超時。');
+            }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+        }
+    }
+</script>
+</body>
+</html>
