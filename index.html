@@ -7,11 +7,11 @@
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f7f9fc; padding: 20px; color: #333; }
         .card { background: white; border-radius: 15px; padding: 30px 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-top: 20px; }
-        img.pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; }
+        img.pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 3px solid #eee; }
         h1 { color: #e74c3c; font-size: 24px; margin-bottom: 10px; }
         p { font-size: 16px; line-height: 1.5; margin-bottom: 20px; }
-        .phone-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 18px; margin-bottom: 15px;}
-        .location-btn { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; width: 100%; box-sizing: border-box; }
+        .phone-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 18px; margin-bottom: 15px; width: 80%; box-sizing: border-box;}
+        .location-btn { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; width: 80%; box-sizing: border-box; }
         .admin-link { display: inline-block; margin-top: 30px; color: #b2bec3; font-size: 12px; text-decoration: none; }
     </style>
 </head>
@@ -35,8 +35,8 @@
     var urlParams = new URLSearchParams(window.location.search);
     var BIN_ID = urlParams.get('id'); 
 
-    // ✅ 您的 JSONBin Master Key 已经安全嵌入此处
-    var MASTER_KEY = '$2a$10$wAaxcxvHlr5HLr.KSYD87uBRpp4yNhmQWmhMmZvy/ux0kGrMv4aPm'; 
+    // 💡 提示：如果你的 JSONBin 設置為 Public，這裡可以留空，更安全！
+    var MASTER_KEY = 'YOUR_MASTER_KEY_HERE'; 
 
     var BARK_KEY = ''; 
     var petName = '新銘牌';
@@ -51,31 +51,37 @@
 
         document.getElementById('adminEntrance').href = 'admin.html?id=' + BIN_ID;
 
-        // 加上 nocache 时间戳，彻底干掉手机微信的顽固旧缓存
-        var jsonUrl = 'https://api.jsonbin.io/v3/b/' + BIN_ID + '?nocache=' + Date.now();
+        // 使用 JSONBin 公開路徑（如果是 Private 請確保上方填寫了 MASTER_KEY）
+        var jsonUrl = 'https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest?nocache=' + Date.now();
         var hasRendered = false;
 
         var cloudTimeout = setTimeout(function() {
-            if (!hasRendered) { hasRendered = true; document.getElementById('status-text').innerText = "❌ 載入超時，請直接聯絡卡片上的備用電話。"; }
-        }, 3000);
+            if (!hasRendered) { 
+                hasRendered = true; 
+                document.getElementById('status-text').innerText = "❌ 載入超時，請直接聯絡卡片上的備用電話。"; 
+            }
+        }, 5000);
 
-        // 携带控制密钥安全读取私有盒子
+        var headers = {};
+        if (MASTER_KEY && MASTER_KEY !== 'YOUR_MASTER_KEY_HERE') {
+            headers['X-Master-Key'] = MASTER_KEY;
+        }
+
         fetch(jsonUrl, {
             method: 'GET',
-            headers: {
-                'X-Master-Key': MASTER_KEY
-            }
+            headers: headers
         })
         .then(function(res) { return res.json(); })
         .then(function(resData) {
             if (resData && !hasRendered) {
-                hasRendered = true; clearTimeout(cloudTimeout);
+                hasRendered = true; 
+                clearTimeout(cloudTimeout);
                 
-                // 完美剥离 JSONBin 的数据外壳
                 var data = resData.record || resData; 
                 
                 if (data.petName) petName = data.petName;
                 if (data.ownerPhone) ownerPhone = data.ownerPhone;
+                // 完美兼容 Base64 長代碼圖片或普通網址
                 if (data.petPicUrl) petPicUrl = data.petPicUrl;
                 if (data.barkKey) BARK_KEY = data.barkKey;
                 
@@ -85,7 +91,7 @@
                 if (ownerPhone) {
                     var pBtn = document.getElementById('phoneBtn');
                     pBtn.href = 'tel:' + ownerPhone;
-                    pBtn.innerText = '📞 撥打主人電話';
+                    pBtn.innerText = '📞 撥打主人電話 (' + ownerPhone + ')';
                     pBtn.style.background = '#2ecc71';
                 }
                 if (BARK_KEY) {
@@ -101,7 +107,11 @@
             }
         })
         .catch(function(err) {
-            if (!hasRendered) { hasRendered = true; clearTimeout(cloudTimeout); }
+            if (!hasRendered) { 
+                hasRendered = true; 
+                clearTimeout(cloudTimeout); 
+                document.getElementById('status-text').innerText = "❌ 讀取失敗，請確認元件 ID 是否在該帳號下。";
+            }
         });
     };
 
@@ -134,35 +144,4 @@
         var radLat = lat / 180.0 * Math.PI, magic = Math.sin(radLat);
         magic = 1 - ee * magic * magic; var sqrtMagic = Math.sqrt(magic);
         dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
-        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
-        return [lng + dLng, lat + dLat];
-    }
-
-    function sendLocation() {
-        if(!BARK_KEY) return;
-        var btn = document.getElementById('locBtn');
-        var statusText = document.getElementById('status-text');
-        btn.innerText = "正在獲取位置..."; btn.disabled = true;
-
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                var rawLat = position.coords.latitude; var rawLon = position.coords.longitude;
-                var corrected = wgs84ToGcj02(rawLon, rawLat);
-                var lon = corrected[0], lat = corrected[1];
-                
-                var mapUrl = 'https://maps.apple.com/?ll=' + lat + ',' + lon + '&q=' + encodeURIComponent(petName + '被掃描的位置');
-                var title = encodeURIComponent('⚠️ 緊急：' + petName + '的防丟牌被掃描了！');
-                var body = encodeURIComponent('好心人共享了精確位置。點此通知直接喚起地圖查看！');
-                
-                new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + title + '/' + body + '?url=' + encodeURIComponent(mapUrl) + '&sound=alarm';
-                statusText.innerText = "✅ 位置已成功發送！非常感謝您的善舉！";
-                statusText.style.color = "#27ae60"; btn.innerText = "發送成功";
-            }, function(error) {
-                statusText.innerText = "❌ 獲取位置失敗，請直接撥打電話聯繫主人。";
-                new Image().src = 'https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('⚠️ 有人掃碼但未成功獲取位置') + '/' + encodeURIComponent('對方拒絕了位置授權或GPS超時。請保持電話暢通！');
-            }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
-        }
-    }
-</script>
-</body>
-</html>
+        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.
