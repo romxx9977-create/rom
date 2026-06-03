@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>寵物防丟牌管理後台</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f5f7fa; padding: 15px; color: #333; margin: 0; }
+        .admin-card { background: white; border-radius: 16px; padding: 25px 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 450px; margin: 15px auto; box-sizing: border-box; }
+        h2 { text-align: center; color: #2c3e50; margin-top: 0; font-size: 22px; margin-bottom: 25px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 15px; color: #2c3e50; }
+        input[type="text"], input[type="tel"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background-color: #fafafa; }
+        .upload-box { text-align: center; border: 2px dashed #cbd5e0; border-radius: 12px; padding: 15px; background: #f8fafc; cursor: pointer; position: relative; }
+        .upload-box input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .preview-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-top: 10px; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: none; }
+        button { width: 100%; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-main { background: #2ecc71; box-shadow: 0 4px 12px rgba(46,204,113,0.3); margin-top: 10px; }
+        .btn-load { background: #3498db; margin-bottom: 20px; }
+        #msg { text-align: center; font-weight: bold; font-size: 14px; margin-top: 15px; }
+        hr { border: 0; border-top: 1px solid #edf2f7; margin: 20px 0; }
+        .advanced-title { text-align: center; font-size: 12px; color: #a0aec0; cursor: pointer; margin-top: 25px; text-decoration: underline; }
+        .advanced-panel { display: none; margin-top: 15px; padding: 15px; background: #edf2f7; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="admin-card">
+    <h2>🐾 寵物資料修改中心</h2>
+    
+    <button class="btn-load" onclick="loadCurrentData()">🔄 第一步：點擊載入當前雲端資料</button>
+    <hr>
+
+    <div class="form-group"><label>🐶 寵物名字</label><input type="text" id="pName" placeholder="請填寫寵物名字"></div>
+    <div class="form-group"><label>📞 主人手機號碼</label><input type="tel" id="pPhone" placeholder="請輸入手機號碼"></div>
+    <div class="form-group">
+        <label>📸 寵物照片</label>
+        <div class="upload-box">
+            <span id="uploadHint" style="color: #718096; font-size: 14px;">➕ 點擊選擇照片或拍照</span>
+            <input type="file" id="fileInput" accept="image/*" onchange="compressAndPreview(event)">
+            <br>
+            <img id="avatarPreview" class="preview-img" src="" alt="預覽圖">
+        </div>
+    </div>
+    <div class="form-group"><label>🔔 Bark Key (通知金鑰)</label><input type="text" id="bKey" placeholder="請輸入您的 Bark Key"></div>
+
+    <input type="hidden" id="pPicBase64">
+    <button id="saveBtn" class="btn-main" onclick="saveData()">💾 第二步：點擊保存修改</button>
+    <div id="msg"></div>
+
+    <div class="advanced-title" onclick="toggleAdvanced()">⚙️ 進階核心設定 (客戶平時勿動)</div>
+    <div id="advancedPanel" class="advanced-panel">
+        <div class="form-group">
+            <label style="font-size: 12px;">JSONBin Master Key</label>
+            <input type="text" id="mKey" placeholder="首次需手動填入Master Key">
+        </div>
+        <div class="form-group">
+            <label style="font-size: 12px;">JSONBin Bin ID</label>
+            <input type="text" id="bId" readonly style="background-color: #eee; color: #666;">
+        </div>
+    </div>
+</div>
+
+<script>
+    // 自動從網址獲取 ID 參數
+    var urlParams = new URLSearchParams(window.location.search);
+    var currentBinId = urlParams.get('id');
+
+    window.onload = function() {
+        if(currentBinId) {
+            document.getElementById('bId').value = currentBinId;
+        } else {
+            alert('警告：網址中缺少 id 參數，將無法與雲端同步！');
+        }
+        if(localStorage.getItem('jsb_mkey')) {
+            document.getElementById('mKey').value = localStorage.getItem('jsb_mkey');
+            if(currentBinId) loadCurrentData();
+        }
+    };
+
+    function toggleAdvanced() {
+        var panel = document.getElementById('advancedPanel');
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function showMsg(text, color) {
+        var m = document.getElementById('msg'); m.innerText = text; m.style.color = color;
+    }
+
+    function compressAndPreview(event) {
+        var file = event.target.files[0]; if (!file) return;
+        showMsg('⏳ 正在處理並優化圖片...', '#3498db');
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onload = function() {
+                var canvas = document.createElement('canvas');
+                var max_size = 300; var width = img.width; var height = img.height;
+                if (width > height) { if (width > max_size) { height *= max_size / width; width = max_size; } } 
+                else { if (height > max_size) { width *= max_size / height; height = max_size; } }
+                canvas.width = width; canvas.height = height;
+                var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                var compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                var preview = document.getElementById('avatarPreview');
+                preview.src = compressedBase64; preview.style.display = 'inline-block';
+                document.getElementById('uploadHint').innerText = "✅ 照片已就緒";
+                document.getElementById('pPicBase64').value = compressedBase64;
+                showMsg('👍 照片處理完成！別忘了點下方保存。', '#27ae60');
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function loadCurrentData() {
+        var mKey = document.getElementById('mKey').value.trim();
+        var bId = document.getElementById('bId').value.trim();
+        if(!mKey) { toggleAdvanced(); showMsg('💡 請在下方展開【進階設定】填入 Master Key！', '#e67e22'); return; }
+        if(!bId) return;
+
+        showMsg('正在獲取最新雲端資料...', '#3498db');
+        fetch('https://api.jsonbin.io/v3/b/' + bId + '?meta=false', {
+            method: 'GET', headers: { 'X-Master-Key': mKey }
+        })
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+            if(data && !data.message) {
+                if(data.petName) document.getElementById('pName').value = data.petName;
+                if(data.ownerPhone) document.getElementById('pPhone').value = data.ownerPhone;
+                if(data.barkKey) document.getElementById('bKey').value = data.barkKey;
+                if(data.petPicUrl) {
+                    var preview = document.getElementById('avatarPreview');
+                    preview.src = data.petPicUrl; preview.style.display = 'inline-block';
+                    document.getElementById('pPicBase64').value = data.petPicUrl;
+                    document.getElementById('uploadHint').innerText = "📸 雲端已有照片";
+                }
+                localStorage.setItem('jsb_mkey', mKey);
+                showMsg('✅ 當前資料已同步！', '#27ae60');
+            } else { showMsg('❌ 載入失敗，請檢查 Master Key。', '#e74c3c'); }
+        }).catch(function(e){ showMsg('❌ 網路錯誤', '#e74c3c'); });
+    }
+
+    function saveData() {
+        var mKey = document.getElementById('mKey').value.trim();
+        var bId = document.getElementById('bId').value.trim();
+        var pName = document.getElementById('pName').value.trim();
+        var pPhone = document.getElementById('pPhone').value.trim();
+        var pPic = document.getElementById('pPicBase64').value.trim();
+        var bKey = document.getElementById('bKey').value.trim();
+
+        if(!mKey) { alert('缺少 Master Key！'); return; }
+        if(!pName || !pPhone) { alert('名字和電話不能為空！'); return; }
+
+        var saveBtn = document.getElementById('saveBtn'); saveBtn.disabled = true;
+        showMsg('🚀 正在同步到雲端，請稍候...', '#3498db');
+
+        var payload = { petName: pName, ownerPhone: pPhone, petPicUrl: pPic || "https://images.unsplash.com/photo-1543466835-00a7907e9de1", barkKey: bKey };
+
+        fetch('https://api.jsonbin.io/v3/b/' + bId, {
+            method: 'PUT', headers: { 'X-Master-Key': mKey, 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        })
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+            saveBtn.disabled = false;
+            if(data && data.record) {
+                showMsg('🎉 修改成功！防丟牌已即時同步！', '#27ae60');
+                localStorage.setItem('jsb_mkey', mKey);
+            } else { showMsg('❌ 保存失敗。', '#e74c3c'); }
+        }).catch(function(e){ saveBtn.disabled = false; showMsg('❌ 網路故障', '#e74c3c'); });
+    }
+</script>
+</body>
+</html>
