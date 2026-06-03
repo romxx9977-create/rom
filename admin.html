@@ -30,7 +30,7 @@
     <input type="text" id="binId" placeholder="請輸入 24 位元件 ID">
 
     <label>JSONBin Master Key</label>
-    <input type="password" id="masterKey" placeholder="請輸入最高管理密鑰 (Master Key)">
+    <input type="password" id="masterKey" placeholder="請輸入控制台最高管理密鑰 (Master Key)">
     
     <div class="btn-group">
         <button class="btn-load" onclick="loadRemoteData()">🔄 第一步：點此載入雲端資料</button>
@@ -44,20 +44,19 @@
     <label>主人手機號碼</label>
     <input type="text" id="ownerPhone" placeholder="例如：137XXXXXXXX">
 
-    <label>寵物照片 (直接選擇文件上傳)</label>
+    <label>寵物照片 (直接選取本地圖片上傳)</label>
     <input type="file" id="imageInput" accept="image/*" onchange="convertImageToBase64()">
-    <textarea id="petPicUrl" placeholder="照片數據代碼（選擇圖片後會自動生成）" style="height: 60px;" readonly></textarea>
-    <div class="hint">💡 提示：手機拍照體積較大，上傳前請先截圖或壓縮，控制在 100KB 以內。</div>
+    <textarea id="petPicUrl" placeholder="照片數據代碼（上傳照片後由系統自動生成）" style="height: 60px;" readonly></textarea>
+    <div class="hint">💡 提示：手機直拍照片過大會導致無法儲存，上傳前請截圖或將體積壓縮在 100KB 內。</div>
 
     <label>Bark Key (通知金鑰)</label>
     <input type="text" id="barkKey" placeholder="請輸入您的 Bark App 金鑰">
-    <div class="hint">💡 用於有人掃碼時，主動發送推播通知與精確定位到您的 iPhone。</div>
+    <div class="hint">💡 綁定後，有人掃碼時會第一時間向您的 iPhone 發送實時警報。</div>
 
     <button class="btn-save" onclick="saveDataToCloud()">🟢 第二步：點此保存修改</button>
 </div>
 
 <script>
-    // 頁面載入時，自動從網址解析 ?id=xxxx 並填入輸入框
     window.onload = function() {
         var urlParams = new URLSearchParams(window.location.search);
         var idParam = urlParams.get('id');
@@ -66,7 +65,6 @@
         }
     };
 
-    // 本地圖片轉 Base64 邏輯
     function convertImageToBase64() {
         var file = document.getElementById('imageInput').files[0];
         if (!file) return;
@@ -74,18 +72,17 @@
         var reader = new FileReader();
         reader.onload = function(e) {
             document.getElementById('petPicUrl').value = e.target.result;
-            alert("✅ 照片轉換完成！請記得點擊下方綠色按鈕保存修改。");
+            alert("✅ 照片數據轉碼成功！請點擊最下方綠色按鈕保存同步。");
         };
         reader.readAsDataURL(file);
     }
 
-    // 載入資料
     async function loadRemoteData() {
         var id = document.getElementById('binId').value.trim();
         var key = document.getElementById('masterKey').value.trim();
         
         if (!id || !key) {
-            alert("❌ 請先填寫 Bin ID 和 Master Key 才能載入資料！");
+            alert("❌ 請完整填寫 Bin ID 和 Master Key 才能獲取雲端數據。");
             return;
         }
 
@@ -95,7 +92,7 @@
                 headers: { 'X-Master-Key': key }
             });
             
-            if (!response.ok) throw new Error("驗證失敗，請檢查 ID 或 Key 是否正確");
+            if (!response.ok) throw new Error("讀取失敗，請確認賬號密鑰權限");
             
             var resData = await response.json();
             var data = resData.record || resData;
@@ -105,19 +102,18 @@
             document.getElementById('petPicUrl').value = data.petPicUrl || "";
             document.getElementById('barkKey').value = data.barkKey || "";
             
-            alert("✅ 雲端資料載入成功！現在可以開始修改。");
+            alert("✅ 數據載入成功！");
         } catch (e) {
-            alert("❌ 載入失敗：" + e.message);
+            alert("❌ 錯誤：" + e.message);
         }
     }
 
-    // 保存資料
     async function saveDataToCloud() {
         var id = document.getElementById('binId').value.trim();
         var key = document.getElementById('masterKey').value.trim();
         
         if (!id || !key) {
-            alert("❌ 請填寫 Bin ID 和 Master Key 才能進行保存！");
+            alert("❌ 保存失敗，驗證信息不完整。");
             return;
         }
 
@@ -139,15 +135,14 @@
             });
 
             if (response.ok) {
-                alert("🎉 保存成功！防丟牌資料已同步至雲端。");
+                alert("🎉 保存成功！數據已完美同步到雲端服務器。");
             } else {
-                alert("❌ 保存失敗，請確認 Key 權限或網絡狀況。");
+                alert("❌ 保存失敗，請確認您的數據體積是否超限或 Key 是否正確。");
             }
         } catch (e) {
-            alert("❌ 發生錯誤：" + e.message);
+            alert("❌ 出錯了：" + e.message);
         }
     }
 </script>
-
 </body>
 </html>
