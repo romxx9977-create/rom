@@ -13,9 +13,6 @@
         .phone-btn { display: inline-block; background: #2ecc71; color: white; padding: 12px 25px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 18px; margin-bottom: 15px;}
         .location-btn { background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; width: 100%; box-sizing: border-box; }
         .admin-link { display: inline-block; margin-top: 30px; color: #b2bec3; font-size: 12px; text-decoration: none; }
-        /* 智能输入框样式 */
-        .input-box { margin-top: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 80%; font-size: 14px; text-align: center; }
-        .submit-btn { background: #e67e22; color: white; border: none; padding: 10px 20px; margin-top: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -30,21 +27,16 @@
     <button class="location-btn" onclick="sendLocation()" id="locBtn" disabled style="background:#bdc3c7;">📍 點擊將我的位置發給主人</button>
     <p id="status-text" style="font-size: 12px; color: #7f8c8d; margin-top: 15px;">(等待資料載入中...)</p>
     
-    <div id="input-area" style="display: none; margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;">
-        <p style="font-size: 13px; color: #e67e22;">💡 检測到未绑定有效元件 ID，请输入您的 Bin ID 进行调试：</p>
-        <input type="text" id="binIdInput" class="input-box" placeholder="请输入例如: 65f1xxxx..."><br>
-        <button onclick="redirectToId()" class="submit-btn">绑定并进入测试</button>
-    </div>
-    
     <a id="adminEntrance" href="#" class="admin-link">⚙️ 專屬主人初始化與資料修改設定</a>
 </div>
 
 <script>
+    // ======================== ⚙️ 動態參數解析 ========================
     var urlParams = new URLSearchParams(window.location.search);
     var BIN_ID = urlParams.get('id'); 
 
-    // 只读密钥
-    var ACCESS_KEY = '$2a$10$sLMmc1OjC73UQINRKdsxe.J528TgvBlpnsEQQp/mMjmVAL/eJjdiS'; 
+    // ✅ 您的 JSONBin Master Key 已经安全嵌入此处
+    var MASTER_KEY = '$2a$10$wAaxcxvHlr5HLr.KSYD87uBRpp4yNhmQWmhMmZvy/ux0kGrMv4aPm'; 
 
     var BARK_KEY = ''; 
     var petName = '新銘牌';
@@ -52,39 +44,34 @@
     var petPicUrl = 'https://images.unsplash.com/photo-1543466835-00a7907e9de1';
 
     window.onload = function() {
-        // 如果没有获取到网址后面的 ?id=xxx
         if (!BIN_ID) {
             document.getElementById('status-text').innerText = "⚠️ 錯誤：二維碼未綁定有效的元件ID！";
-            document.getElementById('input-area').style.display = 'block'; // 展开手动输入框
             return;
         }
 
         document.getElementById('adminEntrance').href = 'admin.html?id=' + BIN_ID;
 
+        // 加上 nocache 时间戳，彻底干掉手机微信的顽固旧缓存
         var jsonUrl = 'https://api.jsonbin.io/v3/b/' + BIN_ID + '?nocache=' + Date.now();
         var hasRendered = false;
 
         var cloudTimeout = setTimeout(function() {
-            if (!hasRendered) { 
-                hasRendered = true; 
-                document.getElementById('status-text').innerText = "❌ 載入超時，請直接聯絡卡片上的備用電話。"; 
-            }
-        }, 4000);
+            if (!hasRendered) { hasRendered = true; document.getElementById('status-text').innerText = "❌ 載入超時，請直接聯絡卡片上的備用電話。"; }
+        }, 3000);
 
-        var fetchOptions = {
+        // 携带控制密钥安全读取私有盒子
+        fetch(jsonUrl, {
             method: 'GET',
-            headers: { 'X-Access-Key': ACCESS_KEY }
-        };
-
-        fetch(jsonUrl, fetchOptions)
-        .then(function(res) { 
-            if (!res.ok) { throw new Error('HTTP ' + res.status); }
-            return res.json(); 
+            headers: {
+                'X-Master-Key': MASTER_KEY
+            }
         })
+        .then(function(res) { return res.json(); })
         .then(function(resData) {
             if (resData && !hasRendered) {
                 hasRendered = true; clearTimeout(cloudTimeout);
                 
+                // 完美剥离 JSONBin 的数据外壳
                 var data = resData.record || resData; 
                 
                 if (data.petName) petName = data.petName;
@@ -106,6 +93,7 @@
                     lBtn.disabled = false;
                     lBtn.style.background = '#3498db';
                     document.getElementById('status-text').innerText = "(為保護隱私，需要您允許獲取位置)";
+                    
                     executeOnLoadNotify();
                 } else {
                     document.getElementById('status-text').innerText = "💡 提示：該銘牌尚未啟用，請點擊下方連結初始化。";
@@ -114,19 +102,8 @@
         })
         .catch(function(err) {
             if (!hasRendered) { hasRendered = true; clearTimeout(cloudTimeout); }
-            document.getElementById('status-text').innerText = "❌ 讀取失敗。請確認元件 ID 是否在該賬號下。";
         });
     };
-
-    // 辅助跳转函数
-    function redirectToId() {
-        var idVal = document.getElementById('binIdInput').value.trim();
-        if(idVal) {
-            window.location.href = window.location.origin + window.location.pathname + '?id=' + idVal;
-        } else {
-            alert('请输入有效的 Bin ID！');
-        }
-    }
 
     function executeOnLoadNotify() {
         if(!BARK_KEY) return;
