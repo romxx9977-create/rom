@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理后台</title>
+    <style>
+        body { font-family: sans-serif; max-width: 400px; margin: 20px auto; padding: 20px; }
+        input, textarea { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h2>修改信息</h2>
+    <input type="text" id="binId" placeholder="输入 Bin ID">
+    <button onclick="loadForm()">读取已有数据</button>
+    <hr>
+    <input type="text" id="petName" placeholder="宠物名字">
+    <input type="text" id="petBreed" placeholder="品种">
+    <input type="text" id="petStatus" placeholder="状态">
+    <input type="text" id="petPhone" placeholder="主人电话">
+    <textarea id="petNotice" placeholder="寄语" rows="4"></textarea>
+    <button onclick="saveData()" style="background:#2196F3;">保存修改</button>
+
+<script>
+    const CONFIG = { API_KEY: '$2a$10$ifFU3oUE7yOAkZ3JnQ0zHek4A5BDXNO3c3blR8nKSyJwmEIo/Zjc6' };
+
+    async function loadForm() {
+        const id = document.getElementById('binId').value;
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, { headers: {'X-Access-Key': CONFIG.API_KEY} });
+        const data = await res.json();
+        const p = data.record;
+        document.getElementById('petName').value = p.petName || '';
+        document.getElementById('petBreed').value = p.petBreed || '';
+        document.getElementById('petStatus').value = p.petStatus || '';
+        document.getElementById('petPhone').value = p.petPhone || '';
+        document.getElementById('petNotice').value = p.petNotice || '';
+    }
+
+    async function saveData() {
+        const id = document.getElementById('binId').value;
+        const payload = {
+            petName: document.getElementById('petName').value,
+            petBreed: document.getElementById('petBreed').value,
+            petStatus: document.getElementById('petStatus').value,
+            petPhone: document.getElementById('petPhone').value,
+            petNotice: document.getElementById('petNotice').value
+        };
+        await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Access-Key': CONFIG.API_KEY },
+            body: JSON.stringify(payload)
+        });
+        alert('更新成功！');
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宠物资料 - 更新版</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .box { background: white; width: 100%; max-width: 400px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; }
+        .row { margin: 20px 0; padding-bottom: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        .label { font-weight: bold; color: #888; display: block; font-size: 0.9em; }
+        .val { font-size: 1.2em; color: #333; }
+        .btn { display: block; background: #ff6b6b; color: white; padding: 15px; border-radius: 50px; text-decoration: none; font-weight: bold; margin-top: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2 id="pName">正在读取...</h2>
+    <div class="row"><span class="label">品种</span><span id="pBreed" class="val">-</span></div>
+    <div class="row"><span class="label">状态</span><span id="pStatus" class="val">-</span></div>
+    <div class="row"><span class="label">寄语</span><p id="pNotice" class="val" style="margin:5px 0">-</p ></div>
+    <a id="btnCall" class="btn" href=" ">拨打主人电话</a >
+</div>
+
+<script>
+    const KEY = '$2a$10$ifFU3oUE7yOAkZ3JnQ0zHek4A5BDXNO3c3blR8nKSyJwmEIo/Zjc6';
+    async function init() {
+        const id = new URLSearchParams(window.location.search).get('id');
+        if (!id) return;
+        try {
+            const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, { headers: { 'X-Access-Key': KEY } });
+            const data = (await res.json()).record;
+            document.getElementById('pName').innerText = data.petName || '宠物';
+            document.getElementById('pBreed').innerText = data.petBreed || '未知';
+            document.getElementById('pStatus').innerText = data.petStatus || '正常';
+            document.getElementById('pNotice').innerText = data.petNotice || '无';
+            document.getElementById('btnCall').href = `tel:${data.petPhone}`;
+        } catch(e) { document.getElementById('pName').innerText = '读取失败'; }
+    }
+    init();
+</script>
+</body>
+</html>
