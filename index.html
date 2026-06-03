@@ -8,9 +8,9 @@
         body { font-family: sans-serif; background: #f4f6f8; display: flex; justify-content: center; padding: 20px; }
         .card { background: white; width: 100%; max-width: 400px; padding: 30px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
         .pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.2); margin-bottom: 20px; }
-        .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border-radius: 50px; text-decoration: none; font-weight: bold; border: none; cursor: pointer; }
-        .btn-call { background: #555; color: white; }
-        .btn-loc { background: #888; color: white; }
+        .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border-radius: 50px; text-decoration: none; font-weight: bold; border: none; }
+        .btn-call { background: #a0a0a0; color: white; }
+        .btn-loc { background: #b0b0b0; color: white; }
     </style>
 </head>
 <body>
@@ -21,7 +21,7 @@
     <p>如果您看到了這個頁面，說明我可能迷路了。<br>我的主人現在非常急切，請您幫幫我！</p >
     
     <a id="btnCall" class="btn btn-call" href=" ">暫無主人電話</a >
-    <button class="btn btn-loc">點擊將我的位置發給主人</button>
+    <a class="btn btn-loc" href="#">點擊將我的位置發給主人</a >
     <p id="errorMsg" style="color:red; font-size:0.9em;"></p >
 </div>
 
@@ -30,31 +30,20 @@
     const binId = urlParams.get('id');
 
     async function loadPetData() {
-        if (!binId) {
-            document.getElementById('errorMsg').innerText = "缺少元件 ID";
-            return;
-        }
+        if (!binId) return;
         try {
-            // 修正：确保使用正确的 API 地址
             const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
-            const json = await res.json();
-            const data = json.record;
+            const data = (await res.json()).record;
             
-            // 填充数据
             document.getElementById('petName').innerText = "我是 [" + (data.petName || "未啟用銘牌") + "] 🐶";
             document.getElementById('petPic').src = data.petPic || "https://images.unsplash.com/photo-1543466835-00a7907e9de1";
-            
-            const btnCall = document.getElementById('btnCall');
-            if (data.petPhone) {
-                btnCall.href = "tel:" + data.petPhone;
-                btnCall.innerText = "撥打主人電話";
-            }
+            document.getElementById('btnCall').href = "tel:" + (data.petPhone || "");
+            document.getElementById('btnCall').innerText = data.petPhone ? "撥打主人電話" : "暫無主人電話";
         } catch (e) {
-            document.getElementById('errorMsg').innerText = "❌ 讀取失敗。請確認元件 ID 是否正確且為公開狀態。";
+            document.getElementById('errorMsg').innerText = "❌ 讀取失敗。請確認元件 ID 是否在該帳號下。";
         }
     }
     loadPetData();
 </script>
 </body>
 </html>
-
