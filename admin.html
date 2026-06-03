@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -14,9 +15,11 @@
     <input type="text" id="binId" placeholder="输入 Bin ID">
     <button onclick="loadForm()">读取数据</button>
     <hr>
-    <input type="text" id="name" placeholder="名字">
-    <input type="text" id="phone" placeholder="电话">
-    <textarea id="notice" placeholder="寄语"></textarea>
+    <input type="text" id="petName" placeholder="宠物名字">
+    <input type="text" id="petBreed" placeholder="品种">
+    <input type="text" id="petStatus" placeholder="状态">
+    <input type="text" id="petPhone" placeholder="主人电话">
+    <textarea id="petNotice" placeholder="寄语"></textarea>
     <button onclick="saveData()">保存修改</button>
 
 <script>
@@ -26,17 +29,22 @@
         const id = document.getElementById('binId').value;
         const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, { headers: {'X-Access-Key': CONFIG.API_KEY} });
         const data = await res.json();
-        document.getElementById('name').value = data.record.name;
-        document.getElementById('phone').value = data.record.phone;
-        document.getElementById('notice').value = data.record.notice;
+        const p = data.record;
+        document.getElementById('petName').value = p.petName || '';
+        document.getElementById('petBreed').value = p.petBreed || '';
+        document.getElementById('petStatus').value = p.petStatus || '';
+        document.getElementById('petPhone').value = p.petPhone || '';
+        document.getElementById('petNotice').value = p.petNotice || '';
     }
 
     async function saveData() {
         const id = document.getElementById('binId').value;
         const payload = {
-            name: document.getElementById('name').value,
-            phone: document.getElementById('phone').value,
-            notice: document.getElementById('notice').value
+            petName: document.getElementById('petName').value,
+            petBreed: document.getElementById('petBreed').value,
+            petStatus: document.getElementById('petStatus').value,
+            petPhone: document.getElementById('petPhone').value,
+            petNotice: document.getElementById('petNotice').value
         };
         await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
             method: 'PUT',
