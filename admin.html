@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>寵物資料管理</title>
+</head>
+<body>
+    <h1>管理後台</h1>
+    <input type="text" id="name" placeholder="寵物名字"><br>
+    <input type="text" id="phone" placeholder="電話"><br>
+    <input type="text" id="photo" placeholder="照片網址"><br>
+    <button onclick="saveData()">💾 保存修改</button>
+    
+    <hr>
+    <h3>進階核心設定</h3>
+    <input type="text" id="binId" placeholder="JSONBin Bin ID">
+    <input type="text" id="masterKey" placeholder="JSONBin Master Key">
+    <button onclick="loadRemote()">載入當前雲端資料</button>
+
+    <script>
+        // 初始化：如果網址有 ID，自動填入輸入框
+        const urlParams = new URLSearchParams(window.location.search);
+        document.getElementById('binId').value = urlParams.get('id') || "";
+
+        async function saveData() {
+            const id = document.getElementById('binId').value;
+            const key = document.getElementById('masterKey').value;
+            const body = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                photo: document.getElementById('photo').value
+            };
+
+            const response = await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': key },
+                body: JSON.stringify(body)
+            });
+            if (response.ok) alert("保存成功！");
+            else alert("保存失敗，請檢查 Key 或 ID");
+        }
+
+        async function loadRemote() {
+            const id = document.getElementById('binId').value;
+            const key = document.getElementById('masterKey').value;
+            const response = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
+                headers: { 'X-Master-Key': key }
+            });
+            const data = await response.json();
+            document.getElementById('name').value = data.record.name;
+            document.getElementById('phone').value = data.record.phone;
+            document.getElementById('photo').value = data.record.photo;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>寵物防丟資訊</title>
+    <script>
+        // 獲取網址 ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const binId = urlParams.get('id');
+
+        async function loadData() {
+            if (!binId) {
+                document.getElementById('status').innerText = "❌ 未檢測到有效的元件 ID";
+                return;
+            }
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
+                const data = await response.json();
+                document.getElementById('name').innerText = data.record.name;
+                document.getElementById('phone').innerText = data.record.phone;
+                document.getElementById('photo').src = data.record.photo;
+            } catch (e) {
+                document.getElementById('status').innerText = "❌ 讀取失敗，請確認 ID 是否正確且為公開狀態";
+            }
+        }
+        window.onload = loadData;
+    </script>
+</head>
+<body>
+    < img id="photo" src="" alt="寵物照片" style="width:200px;">
+    <h1 id="name">載入中...</h1>
+    <p>主人電話: <span id="phone"></span></p >
+    <p id="status"></p >
+    <a href=" ">⚙️ 進入管理後台</a >
+</body>
+</html>
