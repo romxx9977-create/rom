@@ -1,49 +1,45 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>寵物身份標識</title>
+    <title>寵物防丟資訊</title>
     <style>
-        body { font-family: sans-serif; background: #f4f6f8; display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; width: 100%; max-width: 400px; padding: 30px; border-radius: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
-        .pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.2); margin-bottom: 20px; }
-        .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border-radius: 50px; text-decoration: none; font-weight: bold; border: none; }
-        .btn-call { background: #a0a0a0; color: white; }
-        .btn-loc { background: #b0b0b0; color: white; }
+        body { text-align: center; font-family: sans-serif; padding: 20px; }
+        #petPic { width: 200px; height: 200px; object-fit: cover; border-radius: 50%; border: 3px solid #ddd; }
     </style>
 </head>
 <body>
+    <img id="petPic" src="" alt="寵物照片">
+    <h1 id="name">載入中...</h1>
+    <p>主人電話: <span id="phone"></span></p>
+    <p id="status"></p>
 
-<div class="card">
-    < img id="petPic" src="" alt="寵物照片" class="pet-pic">
-    <h2 id="petName">讀取中...</h2>
-    <p>如果您看到了這個頁面，說明我可能迷路了。<br>我的主人現在非常急切，請您幫幫我！</p >
-    
-    <a id="btnCall" class="btn btn-call" href=" ">暫無主人電話</a >
-    <a class="btn btn-loc" href="#">點擊將我的位置發給主人</a >
-    <p id="errorMsg" style="color:red; font-size:0.9em;"></p >
-</div>
+    <script>
+        async function loadData() {
+            const params = new URLSearchParams(window.location.search);
+            const binId = params.get('id');
+            const status = document.getElementById('status');
 
-<script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const binId = urlParams.get('id');
+            if (!binId) {
+                status.innerText = "❌ 錯誤：未提供有效的元件 ID";
+                return;
+            }
 
-    async function loadPetData() {
-        if (!binId) return;
-        try {
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
-            const data = (await res.json()).record;
-            
-            document.getElementById('petName').innerText = "我是 [" + (data.petName || "未啟用銘牌") + "] 🐶";
-            document.getElementById('petPic').src = data.petPic || "https://images.unsplash.com/photo-1543466835-00a7907e9de1";
-            document.getElementById('btnCall').href = "tel:" + (data.petPhone || "");
-            document.getElementById('btnCall').innerText = data.petPhone ? "撥打主人電話" : "暫無主人電話";
-        } catch (e) {
-            document.getElementById('errorMsg').innerText = "❌ 讀取失敗。請確認元件 ID 是否在該帳號下。";
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
+                if (!res.ok) throw new Error("讀取資料失敗");
+                const json = await res.json();
+                const data = json.record;
+
+                document.getElementById('name').innerText = data.name || "未命名";
+                document.getElementById('phone').innerText = data.phone || "無";
+                document.getElementById('petPic').setAttribute('src', data.photo || "");
+            } catch (e) {
+                status.innerText = "❌ 資料讀取失敗，請確認 ID 是否正確";
+            }
         }
-    }
-    loadPetData();
-</script>
+        loadData();
+    </script>
 </body>
 </html>
