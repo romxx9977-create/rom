@@ -3,63 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理後台</title>
+    <title>寵物資料管理後台</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        input, textarea { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; }
+        button { padding: 10px 20px; cursor: pointer; }
+    </style>
 </head>
 <body>
-    <h2>寵物資料管理</h2>
-    <input type="text" id="name" placeholder="寵物名字" style="width:90%; padding:8px;"><br><br>
-    <input type="text" id="phone" placeholder="電話" style="width:90%; padding:8px;"><br><br>
+    <h2>⚙️ 寵物資料管理後台</h2>
     
-    <label>選擇照片 (會自動轉為數據代碼):</label><br>
+    <label>寵物名字：</label>
+    <input type="text" id="name" placeholder="請輸入名字">
+    
+    <label>主人電話：</label>
+    <input type="text" id="phone" placeholder="請輸入電話">
+    
+    <label>照片（上傳後會自動轉換為數據）：</label>
     <input type="file" id="imageInput" accept="image/*" onchange="convert()">
-    <textarea id="photo" placeholder="照片數據" style="width:90%; height:60px; margin-top:5px;"></textarea><br><br>
+    <textarea id="photo" placeholder="照片數據代碼" style="height:80px;"></textarea>
     
-    <button onclick="save()" style="padding:10px 20px; background:green; color:white; border:none;">💾 保存修改</button>
+    <button onclick="saveData()" style="background-color: #28a745; color: white; border: none;">💾 保存修改</button>
     
     <hr>
-    <h3>進階設定</h3>
-    <input type="text" id="binId" placeholder="JSONBin Bin ID" style="width:90%; padding:8px;"><br><br>
-    <input type="password" id="masterKey" placeholder="Master Key (安全性輸入)" style="width:90%; padding:8px;"><br><br>
-    <button onclick="load()">🔄 載入當前雲端資料</button>
+    <h3>核心配置（請確保 ID 與 Key 正確）</h3>
+    <input type="text" id="binId" placeholder="JSONBin Bin ID">
+    <input type="password" id="masterKey" placeholder="JSONBin Master Key">
+    <button onclick="loadRemote()">🔄 載入當前雲端資料</button>
 
     <script>
-        // 自動載入 ID
+        // 頁面加載時自動從網址獲取 ID
         const params = new URLSearchParams(window.location.search);
         document.getElementById('binId').value = params.get('id') || "";
 
+        // 將上傳的圖片轉換為 Base64 字符串
         function convert() {
             const file = document.getElementById('imageInput').files[0];
+            if (!file) return;
             const reader = new FileReader();
-            reader.onload = (e) => document.getElementById('photo').value = e.target.result;
+            reader.onload = (e) => {
+                document.getElementById('photo').value = e.target.result;
+                alert("圖片轉換完成！請點擊保存。");
+            };
             reader.readAsDataURL(file);
         }
 
-        async function save() {
+        // 保存資料到 JSONBin
+        async function saveData() {
             const id = document.getElementById('binId').value;
             const key = document.getElementById('masterKey').value;
-            const data = {
+            const body = {
                 name: document.getElementById('name').value,
                 phone: document.getElementById('phone').value,
                 photo: document.getElementById('photo').value
             };
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-Master-Key': key },
-                body: JSON.stringify(data)
-            });
-            res.ok ? alert("保存成功！") : alert("保存失敗，請檢查 Key");
+
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${id}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'X-Master-Key': key 
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (response.ok) alert("保存成功！");
+                else alert("保存失敗，請檢查 Key 或網絡");
+            } catch (e) {
+                alert("發生錯誤：" + e.message);
+            }
         }
 
-        async function load() {
+        // 從雲端載入資料
+        async function loadRemote() {
             const id = document.getElementById('binId').value;
             const key = document.getElementById('masterKey').value;
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
-                headers: { 'X-Master-Key': key }
-            });
-            const data = await res.json();
-            document.getElementById('name').value = data.record.name;
-            document.getElementById('phone').value = data.record.phone;
-            document.getElementById('photo').value = data.record.photo;
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${id}/latest`, {
+                    headers: { 'X-Master-Key': key }
+                });
+                const data = await response.json();
+                document.getElementById('name').value = data.record.name || "";
+                document.getElementById('phone').value = data.record.phone || "";
+                document.getElementById('photo').value = data.record.photo || "";
+                alert("資料已載入！");
+            } catch (e) {
+                alert("載入失敗，請確認 ID 是否正確且有權限");
+            }
         }
     </script>
 </body>
