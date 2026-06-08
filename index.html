@@ -2,31 +2,36 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>宠物安全防丢系统</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f4f6f8; padding: 20px; }
-        .card { background: white; border-radius: 20px; padding: 30px; max-width: 400px; margin: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .phone-btn { display: block; background: #2ecc71; color: white; padding: 15px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 18px; margin-top: 20px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; background: #f7f9fc; padding: 20px; color: #333; margin: 0; }
+        .card { background: white; border-radius: 20px; padding: 30px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 400px; margin: 20px auto; }
+        .pet-pic { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 4px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { font-size: 22px; color: #2c3e50; margin-bottom: 10px; }
+        .phone-btn { display: block; background: #2ecc71; color: white; padding: 16px; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 18px; margin-top: 25px; box-shadow: 0 4px 12px rgba(46,204,113,0.3); }
+        #status { font-size: 12px; color: #a4b0be; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="card">
         <img id="petPic" class="pet-pic" src="" alt="宠物照片">
-        <h1 id="petName">加载中...</h1>
-        <p>我迷路了，请联系我的主人！</p>
+        <h1 id="petName">载入中...</h1>
+        <p>我迷路了，请帮我联系主人！</p>
         <a id="phoneBtn" class="phone-btn" href="#">拨打主人电话</a>
-        <p id="status" style="font-size: 12px; color: #999; margin-top: 20px;"></p>
+        <p id="status">系统初始化中...</p>
     </div>
 
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const petId = urlParams.get('id');
+    const petId = new URLSearchParams(window.location.search).get('id');
 
     window.onload = () => {
-        if (!petId) return;
-        
+        if (!petId) {
+            document.getElementById('status').innerText = "无效的铭牌 ID";
+            return;
+        }
+
+        // 读取 data.json (带时间戳防止缓存)
         fetch('data.json?t=' + Date.now())
             .then(res => res.json())
             .then(data => {
@@ -35,15 +40,31 @@
                     document.getElementById('petName').innerText = "我是 " + pet.name;
                     document.getElementById('petPic').src = pet.photo;
                     document.getElementById('phoneBtn').href = "tel:" + pet.phone;
-                    document.getElementById('status').innerText = "系统已激活，正在为您守护";
+                    document.getElementById('status').innerText = "✅ 守护中";
                     
-                    // 自动触发通知，无需交互
+                    // 页面加载即触发自动推送
                     if (pet.pushKey) {
-                        fetch(`https://api2.pushdeer.com/message/push?pushkey=${pet.pushKey}&text=${encodeURIComponent('⚠️ ' + pet.name + ' 被人扫码了！')}&desp=${encodeURIComponent('扫描时间：' + new Date().toLocaleString())}`);
+                        sendNotification(pet.pushKey, pet.name);
                     }
+                } else {
+                    document.getElementById('status').innerText = "⚠️ 未找到该宠物信息";
                 }
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "加载失败，请检查网络";
             });
     };
+
+    function sendNotification(key, name) {
+        // 自动判定推送渠道：PushDeer(PDU开头) 或 Bark
+        const msg = encodeURIComponent('⚠️ ' + name + ' 被扫码了，扫描时间：' + new Date().toLocaleString());
+        const url = key.startsWith('PDU') 
+            ? `https://api2.pushdeer.com/message/push?pushkey=${key}&text=${msg}`
+            : `https://api.day.app/${key}/${msg}`;
+        
+        // 使用 Image 对象发送请求，最轻量且不阻塞页面加载
+        new Image().src = url;
+    }
 </script>
 </body>
 </html>
