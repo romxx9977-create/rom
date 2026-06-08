@@ -2,11 +2,13 @@
   "SGB001": {
     "name": "旺财",
     "phone": "13800138000",
-    "photo": "https://via.placeholder.com/150"
+    "photo": "https://example.com/a.jpg",
+    "pushKey": "pushdeer_key_for_sgb001_here" 
   },
   "SGB002": {
     "name": "小黑",
     "phone": "13900139000",
-    "photo": "https://via.placeholder.com/150"
+    "photo": "https://example.com/b.jpg",
+    "pushKey": "bark_key_for_sgb002_here"
   }
 }
