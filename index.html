@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>寵物安全防丟系統</title>
+    <title>宠物安全防丢系统</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; background: #fcfbf7; padding: 20px; color: #333; margin: 0; }
         .card { background: #fffdf9; border-radius: 30px; padding: 40px 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); max-width: 400px; margin: 20px auto; border: 1px solid #f0eee9; }
         .pet-pic { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 4px solid #e2e8f0; margin-bottom: 25px; }
         h1 { font-size: 26px; color: #2d3436; margin: 0 0 15px; }
         .msg { color: #636e72; font-size: 15px; line-height: 1.6; margin-bottom: 30px; }
-        .btn { display: block; width: 100%; padding: 18px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 17px; margin-top: 15px; border: none; cursor: pointer; transition: transform 0.2s; }
+        .btn { display: block; width: 100%; padding: 18px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 17px; margin-top: 15px; border: none; cursor: pointer; transition: transform 0.2s; box-sizing: border-box; }
         .phone-btn { background: #6b8e23; color: white; }
         .loc-btn { background: #4a90e2; color: white; }
         .status-box { margin-top: 25px; padding: 10px; background: #e8f5e9; border-radius: 10px; color: #2e7d32; font-size: 13px; font-weight: bold; }
@@ -18,15 +18,15 @@
 </head>
 <body>
     <div class="card">
-        <img id="petPic" src="" alt="寵物照片" class="pet-pic">
-        <h1 id="petName">加載中...</h1>
-        <p class="msg">如果您看到了這個頁面，說明我可能迷路了。SOS ⚠️<br>我的主人非常急切，請您幫幫我！</p>
+        <img id="petPic" src="" alt="宠物照片" class="pet-pic">
+        <h1 id="petName">加载中...</h1>
+        <p class="msg">如果您看到了这个页面，说明我可能迷路了。SOS ⚠️<br>我的主人非常急切，请您帮帮我！</p>
         
-        <a id="phoneBtn" class="btn phone-btn" href="#">撥打主人電話</a>
-        <button id="locBtn" class="btn loc-btn" onclick="sendLocation()">📍 點擊將我的位置發給主人</button>
+        <button id="phoneBtn" class="btn phone-btn" onclick="callOwner()">📞 拨打主人电话</button>
+        <button id="locBtn" class="btn loc-btn" onclick="sendLocation()">📍 点击将我的位置发给主人</button>
         
-        <div class="status-box" id="status">⏳ 正在連接雲端數據...</div>
-        <p style="font-size: 11px; color: #b2bec3; margin-top: 20px;">💡 提示：本銘牌已激活遠端實時報警。</p>
+        <div class="status-box" id="status">⏳ 正在连接云端数据...</div>
+        <p style="font-size: 11px; color: #b2bec3; margin-top: 20px;">💡 提示：本铭牌已激活远端实时报警。</p>
     </div>
 
 <script>
@@ -76,6 +76,20 @@
     }
 
     // ==========================================
+    // 📞 电话隐藏与弹出逻辑
+    // ==========================================
+    function callOwner() {
+        if (!petData || !petData.phone) {
+            alert("⚠️ 暂未获取到主人电话信息");
+            return;
+        }
+        // 弹出系统级确认框，安全展示手机号，用户点击确认后直接唤起拨号盘
+        if (confirm(`即将拨打主人电话：\n${petData.phone}\n\n是否确认呼叫？`)) {
+            window.location.href = "tel:" + petData.phone;
+        }
+    }
+
+    // ==========================================
     // 💾 页面初始化与数据读取
     // ==========================================
     window.onload = () => {
@@ -86,14 +100,14 @@
                 if (petData) {
                     document.getElementById('petName').innerText = "我是 " + petData.name + " 🐶";
                     document.getElementById('petPic').src = petData.photo;
-                    document.getElementById('phoneBtn').innerText = `📞 撥打主人電話 (${petData.phone})`;
-                    document.getElementById('phoneBtn').href = "tel:" + petData.phone;
-                    document.getElementById('status').innerText = "✅ 數據已讀取，感謝您的熱心！";
+                    // 🟢 纯文本展示，不夹带隐私手机号
+                    document.getElementById('phoneBtn').innerText = "📞 拨打主人电话";
+                    document.getElementById('status').innerText = "✅ 数据已读取，感谢您的热心！";
                     
                     // 自动触发：静默扫码通知（分流路由）
                     if (petData.pushKey) {
-                        const title = encodeURIComponent('👀 ' + petData.name + ' 被人掃碼了！');
-                        const desp = encodeURIComponent('有熱心人打開了防丟網頁，請注意保持電話暢通。');
+                        const title = encodeURIComponent('👀 ' + petData.name + ' 被人扫码了！');
+                        const desp = encodeURIComponent('有热心人打开了防丢网页，请注意保持电话畅通。');
                         
                         let pushUrl = "";
                         if (petData.platform === "bark") {
@@ -104,11 +118,11 @@
                         new Image().src = pushUrl; 
                     }
                 } else {
-                    document.getElementById('status').innerText = "⚠️ 未找到該寵物信息";
+                    document.getElementById('status').innerText = "⚠️ 未找到该宠物信息";
                 }
             })
             .catch(err => {
-                document.getElementById('status').innerText = "❌ 數據加載失敗";
+                document.getElementById('status').innerText = "❌ 数据加载失败";
             });
     };
 
@@ -134,18 +148,18 @@
             // 运行纠偏公式：将原生底层 GPS 转换为国内火星坐标
             const [gcjLon, gcjLat] = wgs84togcj02(rawLon, rawLat);
             
-            const title = encodeURIComponent('⚠️ 緊急：' + petData.name + ' 的實時位置');
+            const title = encodeURIComponent('⚠️ 紧急：' + petData.name + ' 的实时位置');
             let pushUrl = "";
 
             if (petData.platform === "bark") {
                 // 【Bark 路由】
-                const body = encodeURIComponent(`定位精度已鎖定在 ${Math.round(pos.coords.accuracy)}米內`);
+                const body = encodeURIComponent(`定位精度已锁定在 ${Math.round(pos.coords.accuracy)}米内`);
                 const mapUrl = encodeURIComponent(`https://maps.apple.com/?q=${gcjLat},${gcjLon}`);
                 pushUrl = `https://api.day.app/${petData.pushKey}/${title}/${body}?url=${mapUrl}&sound=alarm.caf&group=Sogobu`;
             } else {
                 // 【PushDeer 路由】
-                const mapUrl = `https://uri.amap.com/marker?position=${gcjLon},${gcjLat}&name=${encodeURIComponent('寵物當前位置')}`;
-                const despText = `[點擊此處打開地圖查看位置](${mapUrl})\n\n(當前 GPS 硬件定位精度：誤差约 ${Math.round(pos.coords.accuracy)} 米)`;
+                const mapUrl = `https://uri.amap.com/marker?position=${gcjLon},${gcjLat}&name=${encodeURIComponent('宠物当前位置')}`;
+                const despText = `[点击此处打开地图查看位置](${mapUrl})\n\n(当前 GPS 硬件定位精度：误差约 ${Math.round(pos.coords.accuracy)} 米)`;
                 const desp = encodeURIComponent(despText);
                 pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}&type=markdown`;
             }
@@ -154,22 +168,22 @@
             new Image().src = pushUrl;
             
             setTimeout(() => {
-                btn.innerText = "✅ 位置已發送！";
+                btn.innerText = "✅ 位置已发送！";
                 btn.style.backgroundColor = "#27ae60";
             }, 500);
 
         }, (error) => {
             console.error(error);
             if (error.code === 3) {
-                btn.innerText = "❌ 搜星超時，請到室外開闊地帶重試";
+                btn.innerText = "❌ 搜星超时，请到室外开阔地带重试";
             } else if (error.code === 1) {
-                btn.innerText = "❌ 請允許網頁獲取【精確定位】權限";
+                btn.innerText = "❌ 请允许网页获取【精确定位】权限";
             } else {
-                btn.innerText = "❌ 獲獲失敗：" + error.message;
+                btn.innerText = "❌ 获取失败：" + error.message;
             }
         }, { 
-            enableHighAccuracy: true,  // 🟢 强迫手机开启GPS芯片搜星
-            timeout: 12000,            // 🟢 给系统12秒宽限期去连接卫星，不急着用模糊基站糊弄
+            enableHighAccuracy: true,  // 🟢 强迫手机开启 GPS 芯片搜星
+            timeout: 12000,            // 🟢 给系统 12 秒宽限期去连接卫星
             maximumAge: 0              // 🟢 彻底废除历史缓存，只用最新的干净数据
         }); 
     }
