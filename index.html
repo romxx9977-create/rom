@@ -45,10 +45,19 @@
                     document.getElementById('phoneBtn').href = "tel:" + petData.phone;
                     document.getElementById('status').innerText = "✅ 數據已讀取，感謝您的熱心！";
                     
+                    // 1. 自动静默扫码通知（双平台分流）
                     if (petData.pushKey) {
                         const title = encodeURIComponent('👀 ' + petData.name + ' 被人掃碼了！');
                         const desp = encodeURIComponent('有熱心人打開了防丟網頁，請注意保持電話暢通。');
-                        const pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}`;
+                        
+                        let pushUrl = "";
+                        if (petData.platform === "bark") {
+                            // Bark 扫码通知接口
+                            pushUrl = `https://api.day.app/${petData.pushKey}/${title}/${desp}?sound=glass.caf&group=Sogobu`;
+                        } else {
+                            // PushDeer 扫码通知接口
+                            pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}`;
+                        }
                         new Image().src = pushUrl; 
                     }
                 } else {
@@ -73,16 +82,24 @@
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
             
-            // 核心修復 1：使用最乾淨、無括號的高德 H5 分享鏈接
-            const mapUrl = `https://uri.amap.com/marker?position=${lon},${lat}&name=${encodeURIComponent('寵物當前位置')}`;
-            
             const title = encodeURIComponent('⚠️ 緊急：' + petData.name + ' 的實時位置');
+            let pushUrl = "";
+
+            // 2. 定位发送分流
+            if (petData.platform === "bark") {
+                // 【Bark 专属逻辑】利用 ?url= 传参，支持锁屏直接唤醒原生苹果地图，铃声设为专属报警音
+                const body = encodeURIComponent(`經緯度: ${lat}, ${lon}`);
+                const mapUrl = encodeURIComponent(`https://maps.apple.com/?q=${lat},${lon}`);
+                pushUrl = `https://api.day.app/${petData.pushKey}/${title}/${body}?url=${mapUrl}&sound=alarm.caf&group=Sogobu`;
+            } else {
+                // 【PushDeer 专属逻辑】使用高德 H5 干净链接 + 双重保险文本渲染
+                const mapUrl = `https://uri.amap.com/marker?position=${lon},${lat}&name=${encodeURIComponent('寵物當前位置')}`;
+                const despText = `經緯度: ${lat}, ${lon}\n\n[點擊此處打開地圖查看位置](${mapUrl})\n\n若上方無法點擊，請直接點選下方藍色鏈接：\n${mapUrl}`;
+                const desp = encodeURIComponent(despText);
+                pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}&type=markdown`;
+            }
             
-            // 核心修復 2：雙重保險文本構造（Markdown 鏈接 + 底部純文本直發網址）
-            const despText = `經緯度: ${lat}, ${lon}\n\n[點擊此處打開地圖查看位置](${mapUrl})\n\n若上方無法點擊，請直接點選下方藍色鏈接：\n${mapUrl}`;
-            const desp = encodeURIComponent(despText);
-            
-            const pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}&type=markdown`;
+            // 发送请求
             new Image().src = pushUrl;
             
             setTimeout(() => {
