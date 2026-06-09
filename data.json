@@ -3,12 +3,6 @@
     "name": "阿布",
     "phone": "13726083680",
     "photo": "https://i.ibb.co/DP3w7cGc/image.jpg",
-    "pushKey": "PDU41963TGZM8Crjr6X91GV60rs3RqUsK4J9lOa0N" 
-  },
-  "SGB002": {
-    "name": "小黑",
-    "phone": "13900139000",
-    "photo": "https://example.com/b.jpg",
-    "pushKey": "bark_key_for_sgb002_here"
+    "pushKey": "PDU41963TSgtFiozHDhHBVtHFeFFhYnY52hn8nX"
   }
 }
