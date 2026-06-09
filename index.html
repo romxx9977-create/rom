@@ -113,7 +113,7 @@
     };
 
     // ==========================================
-    // 📍 核心事件：获取定位并本地纠偏发送
+    // 📍 核心事件：强制高精度搜星并本地纠偏发送
     // ==========================================
     function sendLocation() {
         const btn = document.getElementById('locBtn');
@@ -122,32 +122,35 @@
             return;
         }
 
-        btn.innerText = "正在獲取定位...";
+        btn.innerText = "正在激活 GPS 硬件搜星...";
         
         navigator.geolocation.getCurrentPosition(pos => {
             const rawLat = pos.coords.latitude;
             const rawLon = pos.coords.longitude;
             
-            // 🚀 在前端本地将原生 GPS 坐标转换为国内火星坐标（高德/苹果地图通用）
+            // 在控制台打印当前硬件实际返回的精度误差（单位：米）
+            console.log(`[GPS 精度范围]: ${pos.coords.accuracy} 米`);
+            
+            // 运行纠偏公式：将原生底层 GPS 转换为国内火星坐标
             const [gcjLon, gcjLat] = wgs84togcj02(rawLon, rawLat);
             
             const title = encodeURIComponent('⚠️ 緊急：' + petData.name + ' 的實時位置');
             let pushUrl = "";
 
             if (petData.platform === "bark") {
-                // 【Bark 路由】传入纠偏后的坐标，支持 iOS 锁屏界面直接滑动拉起原生系统地图
-                const body = encodeURIComponent(`實時精確位置已鎖定`);
+                // 【Bark 路由】
+                const body = encodeURIComponent(`定位精度已鎖定在 ${Math.round(pos.coords.accuracy)}米內`);
                 const mapUrl = encodeURIComponent(`https://maps.apple.com/?q=${gcjLat},${gcjLon}`);
                 pushUrl = `https://api.day.app/${petData.pushKey}/${title}/${body}?url=${mapUrl}&sound=alarm.caf&group=Sogobu`;
             } else {
-                // 【PushDeer 路由】使用干净的高德 H5 链接，规避任何内置浏览器的强行拦截
+                // 【PushDeer 路由】
                 const mapUrl = `https://uri.amap.com/marker?position=${gcjLon},${gcjLat}&name=${encodeURIComponent('寵物當前位置')}`;
-                const despText = `[點擊此處打開地圖查看位置](${mapUrl})\n\n若上方無法點擊，請直接點選下方藍色鏈接：\n${mapUrl}`;
+                const despText = `[點擊此處打開地圖查看位置](${mapUrl})\n\n(當前 GPS 硬件定位精度：誤差约 ${Math.round(pos.coords.accuracy)} 米)`;
                 const desp = encodeURIComponent(despText);
                 pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}&type=markdown`;
             }
             
-            // 使用 Image 跨域空发，绕过广告拦截插件的 fetch CORS 拦截
+            // 采用 Image 跨域发送请求
             new Image().src = pushUrl;
             
             setTimeout(() => {
@@ -155,9 +158,20 @@
                 btn.style.backgroundColor = "#27ae60";
             }, 500);
 
-        }, () => {
-            btn.innerText = "❌ 獲取失敗，請檢查手機定位權限";
-        }, { enableHighAccuracy: true }); // 强制手机调用高精度 GPS 硬件
+        }, (error) => {
+            console.error(error);
+            if (error.code === 3) {
+                btn.innerText = "❌ 搜星超時，請到室外開闊地帶重試";
+            } else if (error.code === 1) {
+                btn.innerText = "❌ 請允許網頁獲取【精確定位】權限";
+            } else {
+                btn.innerText = "❌ 獲獲失敗：" + error.message;
+            }
+        }, { 
+            enableHighAccuracy: true,  // 🟢 强迫手机开启GPS芯片搜星
+            timeout: 12000,            // 🟢 给系统12秒宽限期去连接卫星，不急着用模糊基站糊弄
+            maximumAge: 0              // 🟢 彻底废除历史缓存，只用最新的干净数据
+        }); 
     }
 </script>
 </body>
