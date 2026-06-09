@@ -1,8 +1,17 @@
+
 {
   "SGB001": {
     "name": "阿布",
-    "phone": "13726083680",
     "photo": "https://i.ibb.co/DP3w7cGc/image.jpg",
-    "pushKey": "PDU41963TGZM8Crjr6X91GV60rs3RqUsK4J9lOa0N"
+    "phone": "13726083680",
+    "platform": "bark", 
+    "pushKey": "SewXx8aCgKaLuUpawUGaZK"
+  },
+  "SGB002": {
+    "name": "小松",
+    "photo": "小松的照片链接",
+    "phone": "137XXXXXXXX",
+    "platform": "pushdeer",
+    "pushKey": "这里填你的PushDeer_Key"
   }
 }
