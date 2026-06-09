@@ -73,12 +73,14 @@
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
             
-            // 【核心修正】更換為相容性最高、點擊即開的騰訊地圖 H5 網頁版連結
-            const mapUrl = `https://apis.map.qq.com/uri/v1/marker?marker=coord:${lat},${lon};title:走失寵物位置;addr:經緯度(${lat},${lon})`;
+            // 核心修復 1：使用最乾淨、無括號的高德 H5 分享鏈接
+            const mapUrl = `https://uri.amap.com/marker?position=${lon},${lat}&name=${encodeURIComponent('寵物當前位置')}`;
             
             const title = encodeURIComponent('⚠️ 緊急：' + petData.name + ' 的實時位置');
-            // 注意：PushDeer 的 Markdown 連結格式為 [文字](網址)
-            const desp = encodeURIComponent(`經緯度: ${lat},${lon} \n\n[點擊此處打開地圖查看位置](${mapUrl})`);
+            
+            // 核心修復 2：雙重保險文本構造（Markdown 鏈接 + 底部純文本直發網址）
+            const despText = `經緯度: ${lat}, ${lon}\n\n[點擊此處打開地圖查看位置](${mapUrl})\n\n若上方無法點擊，請直接點選下方藍色鏈接：\n${mapUrl}`;
+            const desp = encodeURIComponent(despText);
             
             const pushUrl = `https://api2.pushdeer.com/message/push?pushkey=${petData.pushKey}&text=${title}&desp=${desp}&type=markdown`;
             new Image().src = pushUrl;
