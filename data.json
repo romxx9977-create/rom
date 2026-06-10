@@ -9,10 +9,10 @@
   },
   "SGB002": {
     "name": "小松",
-    "photo": "小松的照片链接",
-    "phone": "137XXXXXXXX",
-    "platform": "pushdeer",
-    "pushKey": "这里填你的PushDeer_Key"
+    "photo": "https://i.ibb.co/dwpNpyQr/image.jpg",
+    "phone": "13726083680",
+    "platform": "bark",
+    "pushKey": "这里填你的Key"
   },
    "SGB003": {
     "name": "小松",
