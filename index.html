@@ -61,6 +61,52 @@
     const urlParams = new URLSearchParams(window.location.search);
     const petId = urlParams.get('id') || 'SGB001'; 
 
+    // ==========================================
+    // 🛠️ 內置本地火星坐標系 (GCJ-02) 瞬間糾偏工具
+    // ==========================================
+    const CoordTransform = {
+        EE: 0.00669342162296594323,
+        A: 6378245.0,
+
+        // 地球坐標 (WGS-84) 轉 火星坐標 (GCJ-02)
+        wgs84togcj02: function (lng, lat) {
+            lat = parseFloat(lat);
+            lng = parseFloat(lng);
+            if (this.out_of_china(lng, lat)) {
+                return [lng, lat]; // 中國境外不進行偏移計算
+            }
+            let dlat = this.transformlat(lng - 105.0, lat - 35.0);
+            let dlng = this.transformlng(lng - 105.0, lat - 35.0);
+            let radlat = lat / 180.0 * Math.PI;
+            let magic = Math.sin(radlat);
+            magic = 1 - this.EE * magic * magic;
+            let sqrtmagic = Math.sqrt(magic);
+            dlat = (dlat * 180.0) / ((this.A * (1 - this.EE)) / (magic * sqrtmagic) * Math.PI);
+            dlng = (dlng * 180.0) / (this.A / sqrtmagic * Math.PI * Math.cos(radlat));
+            return [lng + dlng, lat + dlat]; 
+        },
+
+        transformlat: function (lng, lat) {
+            let ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+            ret += (20.0 * Math.sin(6.0 * lng * Math.PI) + 20.0 * Math.sin(2.0 * lng * Math.PI)) * 2.0 / 3.0;
+            ret += (20.0 * Math.sin(lat * Math.PI) + 40.0 * Math.sin(lat / 3.0 * Math.PI)) * 2.0 / 3.0;
+            ret += (160.0 * Math.sin(lat / 12.0 * Math.PI) + 320 * Math.sin(lat * Math.PI / 30.0)) * 2.0 / 3.0;
+            return ret;
+        },
+
+        transformlng: function (lng, lat) {
+            let ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+            ret += (20.0 * Math.sin(6.0 * lng * Math.PI) + 20.0 * Math.sin(2.0 * lng * Math.PI)) * 2.0 / 3.0;
+            ret += (20.0 * Math.sin(lng * Math.PI) + 40.0 * Math.sin(lng / 3.0 * Math.PI)) * 2.0 / 3.0;
+            ret += (150.0 * Math.sin(lng / 12.0 * Math.PI) + 300.0 * Math.sin(lng / 30.0 * Math.PI)) * 2.0 / 3.0;
+            return ret;
+        },
+
+        out_of_china: function (lng, lat) {
+            return (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271);
+        }
+    };
+
     // 2. 頁面初始化：從雲端數據庫異步拉取數據
     window.onload = function() {
         fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
@@ -111,18 +157,18 @@
         });
     };
 
-    // 💡 智能地圖網址生成函數（核心優化）
+    // 💡 智能地圖網址生成函數（已接入糾偏後的精準火星坐標）
     function generateMapUrl(lat, lng) {
         if (currentPlatform === "bark") {
-            // 蘋果自帶地圖協議（格式：lat,lng）
-            return `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent('寵物當前位置')}`;
+            // Bark 用戶通常使用 iPhone，跳轉至蘋果自帶地圖（中國區蘋果地圖底圖已是高德火星坐標，完美兼容）
+            return `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent('寵物當前精準位置')}`;
         } else {
-            // 高德地圖智能協議（格式：lng,lat / 內置App拉起與網頁兜底）
-            return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent('寵物當前位置')}`;
+            // PushDeer 或其餘平台，預設發送國內最精準的高德地圖
+            return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent('寵物當前精準位置')}`;
         }
     }
 
-    // 3. 定位核心邏輯：GPS高精度 + IP網絡模糊定位雙保險
+    // 3. 定位核心邏輯：GPS高精度 + 本地瞬間糾偏計算 + IP網絡模糊定位雙保險
     document.getElementById('locationBtn').onclick = function() {
         const btn = this;
         btn.disabled = true;
@@ -131,11 +177,19 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    // 【高精度 GPS 成功】
-                    const lat = position.coords.latitude.toFixed(6);
-                    const lng = position.coords.longitude.toFixed(6);
-                    const mapUrl = generateMapUrl(lat, lng);
-                    sendAlert(`【高精度GPS定位】點擊通知直接查看寵物位置：`, mapUrl);
+                    // 【高精度 GPS 獲取成功（此時為原始 WGS-84 坐標）】
+                    const rawLat = position.coords.latitude;
+                    const rawLng = position.coords.longitude;
+
+                    // 🚀【核心優化點】在本地瞬間將 WGS-84 轉換為 100% 精準的 GCJ-02 火星坐標
+                    const gcjResult = CoordTransform.wgs84togcj02(rawLng, rawLat);
+                    const correctedLng = gcjResult[0].toFixed(6);
+                    const correctedLat = gcjResult[1].toFixed(6);
+
+                    // 基於糾偏後的坐標生成地圖鏈接
+                    const mapUrl = generateMapUrl(correctedLat, correctedLng);
+                    
+                    sendAlert(`【精準GPS定位】寵物位置已鎖定！點擊通知直接查看：`, mapUrl);
                 },
                 function(error) {
                     console.log("GPS 獲取失敗，啟動 IP 自動補撈...");
@@ -148,7 +202,7 @@
         }
     };
 
-    // IP 定位兜底函數
+    // IP 定位兜底函數（注意：IP定位服務商返回的坐標通常本來就是火星/百度坐標，或精確到城市級別，因此不建議對IP坐標做非線性二次糾偏，保持原樣即可）
     function fetchIpLocation() {
         fetch('https://ipapi.co/json/')
             .then(res => res.json())
