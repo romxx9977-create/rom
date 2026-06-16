@@ -48,7 +48,7 @@
 
 <script>
     // ==========================================
-    // ⚙️ 核心配置區域（已自動為您填入全新安全憑證）
+    // ⚙️ 核心配置區域（已鎖定您的專屬憑證）
     // ==========================================
     const BIN_ID = "6a30f1f0f5f4af5e29f9825b"; 
     const READ_KEY = "$2a$10$wZoaKDlG3lOIN.UobNy6iuNq0obP3Nhv8CROxm97zq6eYY7.cHpJO"; 
@@ -75,7 +75,7 @@
             return res.json();
         })
         .then(resData => {
-            const globalData = resData.record; // 提取 JSONBin 的核心記錄
+            const globalData = resData.record; 
             const pet = globalData[petId];
 
             if (pet) {
@@ -85,11 +85,11 @@
                     document.getElementById('petPhoto').src = pet.photo;
                 }
 
-                // 暫存推送密鑰
+                // 暫存推送密鑰與平台
                 currentPushKey = pet.pushKey;
-                currentPlatform = pet.platform || "pushdeer";
+                currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
-                // 綁定電話按鈕事件（動態喚起，防止爬蟲）
+                // 綁定電話按鈕事件
                 const phoneBtn = document.getElementById('phoneBtn');
                 phoneBtn.onclick = function(e) {
                     e.preventDefault();
@@ -111,6 +111,17 @@
         });
     };
 
+    // 💡 智能地圖網址生成函數（核心優化）
+    function generateMapUrl(lat, lng) {
+        if (currentPlatform === "bark") {
+            // 蘋果自帶地圖協議（格式：lat,lng）
+            return `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent('寵物當前位置')}`;
+        } else {
+            // 高德地圖智能協議（格式：lng,lat / 內置App拉起與網頁兜底）
+            return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent('寵物當前位置')}`;
+        }
+    }
+
     // 3. 定位核心邏輯：GPS高精度 + IP網絡模糊定位雙保險
     document.getElementById('locationBtn').onclick = function() {
         const btn = this;
@@ -123,11 +134,10 @@
                     // 【高精度 GPS 成功】
                     const lat = position.coords.latitude.toFixed(6);
                     const lng = position.coords.longitude.toFixed(6);
-                    const mapUrl = `https://uri.amap.com/marker?position=${lng},${lat}&name=寵物當前位置`;
-                    sendAlert(`【高精度GPS定位】寵物在經緯度(${lat}, ${lng})附近，地圖點擊查看：`, mapUrl);
+                    const mapUrl = generateMapUrl(lat, lng);
+                    sendAlert(`【高精度GPS定位】點擊通知直接查看寵物位置：`, mapUrl);
                 },
                 function(error) {
-                    // 【GPS 被拒絕或失敗，自動降級啟動網絡 IP 定位】
                     console.log("GPS 獲取失敗，啟動 IP 自動補撈...");
                     fetchIpLocation();
                 },
@@ -143,8 +153,16 @@
         fetch('https://ipapi.co/json/')
             .then(res => res.json())
             .then(data => {
+                const lat = data.latitude;
+                const lng = data.longitude;
+                let mapUrl = "";
+                
+                if (lat && lng) {
+                    mapUrl = generateMapUrl(lat, lng);
+                }
+                
                 const locationStr = `${data.city || ''}市 ${data.region || ''} (${data.org || '未知網絡'})`;
-                sendAlert(`【網絡IP模糊定位】GPS被拒絕。寵物大概位於：${locationStr}`, "");
+                sendAlert(`【網絡IP模糊定位】GPS被拒絕。寵物大概位於：${locationStr}`, mapUrl);
             })
             .catch(() => {
                 sendAlert(`【掃碼警報】有人掃描了銘牌，但對方拒絕了定位權限。`, "");
@@ -163,10 +181,11 @@
         const encodedMsg = encodeURIComponent(message);
         const encodedLink = encodeURIComponent(link);
 
-        if (currentPlatform.toLowerCase() === "bark") {
-            requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodedLink}&sound=alarm`;
+        if (currentPlatform === "bark") {
+            // Bark 通道：點擊通知直接打開內置的 apple maps 鏈接
+            requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodedLink}&sound=alarm&isArchive=1`;
         } else {
-            // PushDeer 通道
+            // PushDeer 通道：點擊卡片跳轉高德智能中間頁
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}%20${encodedLink}`;
         }
 
