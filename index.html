@@ -135,6 +135,9 @@
                 currentPushKey = pet.pushKey;
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
+                // 🚀【核心修复】一旦成功加载宠物数据，立刻在后台静默向主人发送“已被扫码”的第一道警报
+                sendBackgroundAlert(`【⚠️ 扫码警报】有人刚刚扫描或触碰了 ${pet.name} 的铭牌！正在等待对方发送定位...`, window.location.href);
+
                 // 绑定电话按钮事件
                 const phoneBtn = document.getElementById('phoneBtn');
                 phoneBtn.onclick = function(e) {
@@ -160,10 +163,8 @@
     // 💡 智能地图网址生成函数（已接入纠偏后的精准火星坐标）
     function generateMapUrl(lat, lng) {
         if (currentPlatform === "bark") {
-            // Bark 用户通常使用 iPhone，跳转至苹果自带地图（中国区苹果地图底图已是高德火星坐标，完美兼容）
             return `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent('宠物当前精准位置')}`;
         } else {
-            // PushDeer 或其余平台，默认发送国内最精准的高德地图
             return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent('宠物当前精准位置')}`;
         }
     }
@@ -177,19 +178,16 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    // 【高精度 GPS 获取成功（此时为原始 WGS-84 坐标）】
                     const rawLat = position.coords.latitude;
                     const rawLng = position.coords.longitude;
 
-                    // 🚀【核心优化点】在本地瞬间将 WGS-84 转换为 100% 精准的 GCJ-02 火星坐标
                     const gcjResult = CoordTransform.wgs84togcj02(rawLng, rawLat);
                     const correctedLng = gcjResult[0].toFixed(6);
                     const correctedLat = gcjResult[1].toFixed(6);
 
-                    // 基于纠偏后的坐标生成地图链接
                     const mapUrl = generateMapUrl(correctedLat, correctedLng);
                     
-                    sendAlert(`【精准GPS定位】宠物位置已锁定！点击通知直接查看：`, mapUrl);
+                    sendAlert(`【📌 精准GPS定位】宠物位置已锁定！点击直接查看导航：`, mapUrl);
                 },
                 function(error) {
                     console.log("GPS 获取失败，启动 IP 自动补捞...");
@@ -216,14 +214,32 @@
                 }
                 
                 const locationStr = `${data.city || ''}市 ${data.region || ''} (${data.org || '未知网络'})`;
-                sendAlert(`【网络IP模糊定位】GPS被拒绝。宠物大概位于：${locationStr}`, mapUrl);
+                sendAlert(`【🌐 网络IP模糊定位】GPS被路人拒绝。大致位于：${locationStr}`, mapUrl);
             })
             .catch(() => {
-                sendAlert(`【扫码警报】有人扫描了铭牌，但对方拒绝了定位权限。`, "");
+                sendAlert(`【⚠️ 权限拒绝】有人扫描了铭牌，但对方拒绝了定位权限。`, "");
             });
     }
 
-    // 4. 统一报警通道发送函数 (支持 Bark / PushDeer)
+    // 🚀【核心修复】新增函数：用于页面打开时在后台默默发通知，绝不弹出 alert 弹窗打扰路人
+    function sendBackgroundAlert(message, link) {
+        if (!currentPushKey || currentPushKey.includes("填你的")) return;
+
+        let requestUrl = "";
+        const encodedMsg = encodeURIComponent(message);
+        const encodedLink = encodeURIComponent(link);
+
+        if (currentPlatform === "bark") {
+            requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodedLink}&sound=alarm&isArchive=1`;
+        } else {
+            requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}%20${encodedLink}`;
+        }
+
+        // 用 no-cors 模式默默发出请求，不破坏前端页面体验
+        fetch(requestUrl, { mode: 'no-cors' }).catch(err => console.log("静默通知发送失败", err));
+    }
+
+    // 4. 统一报警通道发送函数 (用于按钮点击，包含给路人的成功提示弹窗)
     function sendAlert(message, link) {
         if (!currentPushKey || currentPushKey.includes("填你的")) {
             alert("位置获取成功，但该铭牌未配置主人接收密钥。");
@@ -236,10 +252,8 @@
         const encodedLink = encodeURIComponent(link);
 
         if (currentPlatform === "bark") {
-            // Bark 通道
             requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodedLink}&sound=alarm&isArchive=1`;
         } else {
-            // PushDeer 通道
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}%20${encodedLink}`;
         }
 
