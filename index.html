@@ -113,7 +113,7 @@
             }
         })
         .then(res => {
-            if (!res.ok) throw new Error('网络读取失败');
+            if (!res.ok) throw new Error(`数据读取失败(状态码:${res.status})`);
             return res.json();
         })
         .then(resData => {
@@ -148,7 +148,8 @@
         .catch(err => {
             console.error(err);
             document.getElementById('petName').innerText = "加载失败";
-            alert("系统加载失败，请刷新重试");
+            // 核心排查：把隐蔽的报错原因直接打印在弹窗上
+            alert("系统加载失败，原因: " + err.message);
         });
     };
 
@@ -160,7 +161,6 @@
         }
     }
 
-    // 主按钮点击触发逻辑
     document.getElementById('locationBtn').onclick = function() {
         const btn = this;
         btn.disabled = true;
@@ -169,7 +169,6 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    // 1. GPS 获取成功分支
                     const rawLat = position.coords.latitude;
                     const rawLng = position.coords.longitude;
 
@@ -183,7 +182,6 @@
                     sendAlert(`【📌 精准GPS定位】宠物最新位置已锁定！`, mapUrl, userAlertText);
                 },
                 function(error) {
-                    // 2. GPS 获取失败/路人拒绝分支 -> 启动 IP 智能补捞
                     console.log("GPS 获取失败，启动 IP 自动补捞...");
                     fetchIpLocation();
                 },
@@ -194,52 +192,41 @@
         }
     };
 
-    // 智能双重 IP 定位补捞函数
     function fetchIpLocation() {
         const petNameText = document.getElementById('petName').innerText.replace("我是 ", "").replace(" 🐶", "") || "宠物";
         
-        // 核心优化：采用两级备用网络请求，防止单API在国内移动5G网络下遭遇屏蔽或超时
         fetch('https://ipapi.co/json/')
             .then(res => {
                 if(!res.ok) throw new Error("主接口失效");
                 return res.json();
             })
             .then(data => {
-                // 主接口成功解析
                 executeIpSuccessPush(data.latitude, data.longitude, data.city, data.region, data.org, petNameText);
             })
             .catch(() => {
                 console.log("主IP接口异常，紧急切换高速备用接口...");
-                // 备用多线高速接口，国内5G移动网络高相容性
                 fetch('https://api.ip.sb/geoip')
                     .then(res => res.json())
                     .then(data => {
                         executeIpSuccessPush(data.latitude, data.longitude, data.city, data.region, data.isp, petNameText);
                     })
                     .catch(() => {
-                        // 终极兜底方案：两个IP接口全部因网络断开而失败
                         const userAlertText = "提示：未能成功获取您的精准位置。请点击页面上的【拨打主人电话】直接与主人取得联系，谢谢您的善举！🐾";
                         sendAlert(`【⚠️ 权限拒绝】有人扫描了铭牌，对方拒绝了定位权限，且网络IP补捞亦超时失败。`, "", userAlertText);
                     });
             });
     }
 
-    // 处理 IP 解析成功后的动态文本渲染与通知发送
     function executeIpSuccessPush(lat, lng, city, region, networkProvider, petName) {
         let mapUrl = "";
         if (lat && lng) {
             mapUrl = generateMapUrl(lat, lng);
         }
         const locationStr = `${region || ''}省 ${city || ''}市 (${networkProvider || '未知网络运营商'})`;
-        
-        // 重新定制的专属前端友好弹窗文字（解决图1问题）
         const userAlertText = "提示：已将您的大致区域安全同步给主人。请点击页面上的【拨打主人电话】直接与主人取得联系，谢谢您的善举！🐾";
-        
-        // 重新定制的 Bark 动态组合文本（解决图2问题）
         sendAlert(`【🌐 网络IP补捞】有人扫描了 ${petName} 的铭牌，但拒绝了GPS。系统自动捞取对方网络大概位于：${locationStr}`, mapUrl, userAlertText);
     }
 
-    // 统一报警通道发送函数 (加入了对浏览器前端提示语 customAlertText 的灵活调度)
     function sendAlert(message, link, customAlertText) {
         if (!currentPushKey || currentPushKey.includes("填你的")) {
             alert("位置获取成功，但该铭牌未配置主人接收密钥。");
@@ -260,7 +247,6 @@
 
         fetch(requestUrl, { mode: 'no-cors' })
             .then(() => {
-                // 完美解决：如果是GPS成功，弹出成功提示；如果是IP补捞，弹出引导路人打电话的提示
                 alert(customAlertText || "📍 位置已发送给主人！感谢协助。");
             })
             .catch(() => {
