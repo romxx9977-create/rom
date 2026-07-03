@@ -129,6 +129,7 @@
                 currentPushKey = pet.pushKey;
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
+                // 发送背景静默扫码通知
                 sendBackgroundAlert(`【⚠️ 扫码警报】有人刚刚扫描了 ${pet.name} 的铭牌！正等待发送精准定位...`, window.location.href);
 
                 const phoneBtn = document.getElementById('phoneBtn');
@@ -148,7 +149,6 @@
         .catch(err => {
             console.error(err);
             document.getElementById('petName').innerText = "加载失败";
-            // 核心排查：把隐蔽的报错原因直接打印在弹窗上
             alert("系统加载失败，原因: " + err.message);
         });
     };
@@ -159,6 +159,22 @@
         } else {
             return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent('宠物当前定位位置')}`;
         }
+    }
+
+    // 新增：后台静默通知函数（解决报错核心）
+    function sendBackgroundAlert(message, link) {
+        if (!currentPushKey || currentPushKey.includes("填你的")) return;
+        let requestUrl = "";
+        const encodedMsg = encodeURIComponent(message);
+
+        if (currentPlatform === "bark") {
+            const encodedLink = encodeURIComponent(link);
+            requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodedLink}&isArchive=1`;
+        } else {
+            const markdownDesp = link ? `### 🔍 扫码轨迹\n\n[🔗 点击打开网页](${link})` : '';
+            requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}&desp=${encodeURIComponent(markdownDesp)}&type=markdown`;
+        }
+        fetch(requestUrl, { mode: 'no-cors' }).catch(err => console.log("静默通知发送失败", err));
     }
 
     document.getElementById('locationBtn').onclick = function() {
