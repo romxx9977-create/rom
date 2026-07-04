@@ -125,7 +125,7 @@
 
                 // 在线预研：智能适配 iOS 和安卓的短信唤起字串
                 if (pet.phone && pet.phone !== "1XXXXXXXXXX") {
-                    const smsBody = `您好，我刚扫了狗牌，捡到了您的宠物【${pureName}】，我目前所在的位置大概在：`;
+                    const smsBody = `你好，我刚扫了狗牌，捡到了您的宠物【${pureName}】，我目前所在的位置大概在：`;
                     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
                     const separator = isIOS ? '&' : '?';
                     globalSmsUrl = `sms:${pet.phone}${separator}body=${encodeURIComponent(smsBody)}`;
