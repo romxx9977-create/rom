@@ -16,6 +16,7 @@
         .btn:active { transform: scale(0.98); }
         .btn-phone { background-color: #608A1B; }
         .btn-location { background-color: #3B82F6; }
+        .btn-sms { background-color: #E67E22; } /* 橙色按钮，突出显示 */
         .status-banner { display: flex; align-items: center; justify-content: center; gap: 6px; background-color: #E8F5E9; color: #2E7D32; font-size: 14px; font-weight: 600; padding: 12px; border-radius: 12px; margin-bottom: 24px; }
         .footer-tip { font-size: 12px; color: #A0A0A0; display: flex; align-items: center; justify-content: center; gap: 4px; }
     </style>
@@ -35,7 +36,8 @@
     </div>
 
     <a href="#" id="phoneBtn" class="btn btn-phone">📞 拨打主人电话</a>
-    <button id="locationBtn" class="btn btn-location">📌 点击将我的位置发给主人</button>
+    <button id="locationBtn" class="btn btn-location">📌 点击自动发送位置</button>
+    <a href="#" id="smsBtn" class="btn btn-sms">💬 短信告知主人位置</a>
 
     <div class="status-banner">
         <span>✅ 数据已读取，感谢您的热心！</span>
@@ -104,15 +106,18 @@
             const pet = globalData[petId];
 
             if (pet) {
-                document.getElementById('petName').innerText = `我是 ${pet.name} 🐶`;
+                const pureName = pet.name || "小宝贝";
+                document.getElementById('petName').innerText = `我是 ${pureName} 🐶`;
                 if (pet.photo && pet.photo !== "宠物的照片链接") {
                     document.getElementById('petPhoto').src = pet.photo;
                 }
                 currentPushKey = pet.pushKey;
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
-                sendBackgroundAlert(`【⚠️ 静默扫码警报】有人刚刚扫描了 ${pet.name} 的铭牌！正等待对方发送精准定位...`, window.location.href);
+                // 静默发出被扫码的初步通知
+                sendBackgroundAlert(`【⚠️ 静默扫码警报】有人刚刚扫描了 ${pureName} 的铭牌！正等待对方发送精准定位...`, window.location.href);
 
+                // 绑定电话按钮
                 const phoneBtn = document.getElementById('phoneBtn');
                 phoneBtn.onclick = function(e) {
                     e.preventDefault();
@@ -122,6 +127,19 @@
                         alert("该铭牌暂未绑定有效电话号码");
                     }
                 };
+
+                // ⚙️ 核心逻辑：智能适配 iOS 和安卓的短信唤起协议
+                const smsBtn = document.getElementById('smsBtn');
+                if (pet.phone && pet.phone !== "1XXXXXXXXXX") {
+                    const smsBody = `您好，我刚扫了狗牌，捡到了您的宠物【${pureName}】，我目前所在的位置大概在：`;
+                    // 检测是否为苹果系统
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                    const separator = isIOS ? '&' : '?';
+                    smsBtn.href = `sms:${pet.phone}${separator}body=${encodeURIComponent(smsBody)}`;
+                } else {
+                    smsBtn.onclick = function(e) { e.preventDefault(); alert("该铭牌暂未绑定有效电话号码"); };
+                }
+
             } else {
                 document.getElementById('petName').innerText = "未找到数据";
             }
@@ -130,15 +148,6 @@
             document.getElementById('petName').innerText = "加载失败";
         });
     };
-
-    function generateMapUrl(lat, lng, labelName) {
-        const title = labelName || '宠物位置';
-        if (currentPlatform === "bark") {
-            return `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent(title)}`;
-        } else {
-            return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodeURIComponent(title)}`;
-        }
-    }
 
     function sendBackgroundAlert(message, link) {
         if (!currentPushKey || currentPushKey.includes("填你的")) return;
@@ -152,15 +161,12 @@
         fetch(requestUrl, { mode: 'no-cors' }).catch(() => {});
     }
 
-    // ==========================================
-    // 📌 核心逻辑：按钮触发（带温情引导，极大提升 GPS 允许率）
-    // ==========================================
+    // 按钮自动定位流程
     document.getElementById('locationBtn').onclick = function() {
         const btn = this;
         const petNameText = document.getElementById('petName').innerText.replace("我是 ", "").replace(" 🐶", "") || "宠物";
 
-        // 核心优化 1：弹出温情对话框，打消好心人顾虑，引导其在随后的系统弹窗中点击“允许”
-        alert(`【🌟 寻宠求助】\n为了帮小动物精准回家，接下来手机系统会询问“是否允许获取位置”，请务必点击『允许』或『好』。\n\n您的隐私绝对安全，非常感谢您的善举！🐾`);
+        alert(`【🌟 寻宠求助】\n为了帮小动物精准回家，接下来系统会询问“是否允许获取位置”，请务必点击『允许』或『好』。感谢您的善举！🐾`);
 
         btn.disabled = true;
         btn.innerText = "⏳ 正在获取精准位置...";
@@ -174,53 +180,26 @@
                     const correctedLng = gcjResult[0].toFixed(6);
                     const correctedLat = gcjResult[1].toFixed(6);
 
-                    const mapUrl = generateMapUrl(correctedLat, correctedLng, `【精准】${petNameText}的真实GPS位置`);
+                    let mapUrl = "";
+                    if (currentPlatform === "bark") {
+                        mapUrl = `https://maps.apple.com/?ll=${correctedLat},${correctedLng}&q=${encodeURIComponent('【精准】宠物GPS实时位置')}`;
+                    } else {
+                        mapUrl = `https://uri.amap.com/marker?position=${correctedLng},${correctedLat}&name=${encodeURIComponent('【精准】宠物GPS实时位置')}`;
+                    }
                     sendAlert(`【📌 精准GPS定位】${petNameText}的最新精准位置已锁定（误差米级）！`, mapUrl, "📍 位置已成功发送给主人！感谢您的协助。");
                 },
                 function(error) {
-                    console.log("GPS获取被拒绝或超时，启动硬核防误导模糊IP补捞...");
-                    fetchIpLocation();
+                    // 核心逻辑：若好心人拒绝了系统定位权限，直接弹窗指引他们去点下方的短信按钮
+                    alert("提示：由于系统权限受限，无法自动抓取您的位置。您可以直接点击页面上的【💬 短信告知主人位置】按钮，利用手机自带的短信发送具体位置，非常感谢！🐾");
+                    resetLocationButton();
                 },
                 { enableHighAccuracy: true, timeout: 6000 }
             );
         } else {
-            fetchIpLocation();
+            alert("提示：当前浏览器不支持自动定位，请使用下方的电话或短信按钮直接联系主人！🐾");
+            resetLocationButton();
         }
     };
-
-    function fetchIpLocation() {
-        const petNameText = document.getElementById('petName').innerText.replace("我是 ", "").replace(" 🐶", "") || "宠物";
-        
-        window.parseIpProvinceCity = function(data) {
-            if (data && data.pro) {
-                const addr = data.addr || "未知区域网络";
-                
-                // 核心优化 2：彻底去掉误导性的长沙橘子洲地图链接，改成纯文字强力警示主人
-                const warningMsg = `【🌐 网络IP模糊报警】有人扫描了 ${petNameText} 的铭牌（对方拒绝了GPS精准定位）。\n\n网页抓取到对方网络归属地为：${addr}\n\n⚠️【重要提醒】因手机通讯网络特性，全省移动/联通/电信流量的出口均集中在长沙核心机房。所以无论对方在衡阳还是常德，此模糊定位通常都会显示在长沙。这并不代表宠物在长沙！请立刻点击页面按钮直接拨打对方电话核实真实位置！`;
-
-                sendAlert(warningMsg, "", "提示：已将您的大致区域安全同步给主人。请点击页面上的【拨打主人电话】直接与主人取得联系，谢谢您的善举！🐾");
-            } else {
-                triggerFinalFallback(petNameText);
-            }
-            cleanup();
-        };
-
-        function cleanup() {
-            const el = document.getElementById('pconline_script');
-            if (el) el.remove();
-            delete window.parseIpProvinceCity;
-        }
-
-        const script = document.createElement('script');
-        script.id = 'pconline_script';
-        script.src = 'https://whois.pconline.com.cn/ipJson.jsp?callback=parseIpProvinceCity';
-        script.onerror = function() { triggerFinalFallback(petNameText); cleanup(); };
-        document.body.appendChild(script);
-    }
-
-    function triggerFinalFallback(petNameText) {
-        sendAlert(`【⚠️ 权限拒绝】有人扫描了 ${petNameText} 的铭牌，对方拒绝了定位权限，且IP补捞超时。请保持电话畅通！`, "", "提示：未能成功获取位置。请点击【拨打主人电话】直接与主人联络，谢谢！🐾");
-    }
 
     function sendAlert(message, link, customAlertText) {
         if (!currentPushKey || currentPushKey.includes("填你的")) {
@@ -233,7 +212,7 @@
         if (currentPlatform === "bark") {
             requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodeURIComponent(link)}&sound=alarm&isArchive=1`;
         } else {
-            const markdownDesp = link ? `### 📍 宠物精准位置\n\n[🗺️ 点击这里直接打开地图导航](${link})` : '对方拒绝了精准定位权限，请直接电话沟通。';
+            const markdownDesp = `### 📍 宠物精准位置\n\n[🗺️ 点击这里直接打开地图导航](${link})`;
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}&desp=${encodeURIComponent(markdownDesp)}&type=markdown`;
         }
 
@@ -246,7 +225,7 @@
     function resetLocationButton() {
         const btn = document.getElementById('locationBtn');
         btn.disabled = false;
-        btn.innerText = "📌 点击将我的位置发给主人";
+        btn.innerText = "📌 点击自动发送位置";
     }
 </script>
 
