@@ -12,11 +12,10 @@
         .avatar-container img { width: 100%; height: 100%; object-fit: cover; }
         h1 { font-size: 24px; color: #333333; margin-bottom: 16px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px; }
         .intro-text { color: #666666; font-size: 15px; line-height: 1.6; margin-bottom: 30px; padding: 0 10px; }
-        .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 54px; border-radius: 27px; border: none; font-size: 16px; font-weight: 600; color: #FFFFFF; margin-bottom: 16px; cursor: pointer; transition: transform 0.1s ease; text-decoration: none; }
+        .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 54px; border-radius: 27px; border: none; font-size: 16px; font-weight: 600; color: #FFFFFF; margin-bottom: 16px; cursor: pointer; transition: background-color 0.2s, transform 0.1s ease; text-decoration: none; }
         .btn:active { transform: scale(0.98); }
         .btn-phone { background-color: #608A1B; }
         .btn-location { background-color: #3B82F6; }
-        .btn-sms { background-color: #E67E22; } /* 橙色按钮，突出显示 */
         .status-banner { display: flex; align-items: center; justify-content: center; gap: 6px; background-color: #E8F5E9; color: #2E7D32; font-size: 14px; font-weight: 600; padding: 12px; border-radius: 12px; margin-bottom: 24px; }
         .footer-tip { font-size: 12px; color: #A0A0A0; display: flex; align-items: center; justify-content: center; gap: 4px; }
     </style>
@@ -37,7 +36,6 @@
 
     <a href="#" id="phoneBtn" class="btn btn-phone">📞 拨打主人电话</a>
     <button id="locationBtn" class="btn btn-location">📌 点击自动发送位置</button>
-    <a href="#" id="smsBtn" class="btn btn-sms">💬 短信告知主人位置</a>
 
     <div class="status-banner">
         <span>✅ 数据已读取，感谢您的热心！</span>
@@ -57,23 +55,21 @@
 
     let currentPushKey = "";
     let currentPlatform = "pushdeer";
+    let globalSmsUrl = ""; // 全局保存构造好的短信链接
 
     const urlParams = new URLSearchParams(window.location.search);
     const petId = urlParams.get('id') || 'SGB001'; 
 
     // 火星坐标系本地纠偏
     const CoordTransform = {
-        EE: 0.00669342162296594323,
-        A: 6378245.0,
+        EE: 0.00669342162296594323, A: 6378245.0,
         wgs84togcj02: function (lng, lat) {
             lat = parseFloat(lat); lng = parseFloat(lng);
             if (this.out_of_china(lng, lat)) return [lng, lat];
             let dlat = this.transformlat(lng - 105.0, lat - 35.0);
             let dlng = this.transformlng(lng - 105.0, lat - 35.0);
             let radlat = lat / 180.0 * Math.PI;
-            let magic = Math.sin(radlat);
-            magic = 1 - this.EE * magic * magic;
-            let sqrtmagic = Math.sqrt(magic);
+            let magic = Math.sin(radlat); magic = 1 - this.EE * magic * magic; let sqrtmagic = Math.sqrt(magic);
             dlat = (dlat * 180.0) / ((this.A * (1 - this.EE)) / (magic * sqrtmagic) * Math.PI);
             dlng = (dlng * 180.0) / (this.A / sqrtmagic * Math.PI * Math.cos(radlat));
             return [lng + dlng, lat + dlat]; 
@@ -114,12 +110,11 @@
                 currentPushKey = pet.pushKey;
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
-                // 静默发出被扫码的初步通知
+                // 静默扫码警报
                 sendBackgroundAlert(`【⚠️ 静默扫码警报】有人刚刚扫描了 ${pureName} 的铭牌！正等待对方发送精准定位...`, window.location.href);
 
-                // 绑定电话按钮
-                const phoneBtn = document.getElementById('phoneBtn');
-                phoneBtn.onclick = function(e) {
+                // 电话按钮绑定
+                document.getElementById('phoneBtn').onclick = function(e) {
                     e.preventDefault();
                     if (pet.phone && pet.phone !== "1XXXXXXXXXX") {
                         window.location.href = `tel:${pet.phone}`;
@@ -128,16 +123,12 @@
                     }
                 };
 
-                // ⚙️ 核心逻辑：智能适配 iOS 和安卓的短信唤起协议
-                const smsBtn = document.getElementById('smsBtn');
+                // 在线预研：智能适配 iOS 和安卓的短信唤起字串
                 if (pet.phone && pet.phone !== "1XXXXXXXXXX") {
                     const smsBody = `您好，我刚扫了狗牌，捡到了您的宠物【${pureName}】，我目前所在的位置大概在：`;
-                    // 检测是否为苹果系统
                     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
                     const separator = isIOS ? '&' : '?';
-                    smsBtn.href = `sms:${pet.phone}${separator}body=${encodeURIComponent(smsBody)}`;
-                } else {
-                    smsBtn.onclick = function(e) { e.preventDefault(); alert("该铭牌暂未绑定有效电话号码"); };
+                    globalSmsUrl = `sms:${pet.phone}${separator}body=${encodeURIComponent(smsBody)}`;
                 }
 
             } else {
@@ -151,8 +142,7 @@
 
     function sendBackgroundAlert(message, link) {
         if (!currentPushKey || currentPushKey.includes("填你的")) return;
-        let requestUrl = "";
-        const encodedMsg = encodeURIComponent(message);
+        let requestUrl = ""; const encodedMsg = encodeURIComponent(message);
         if (currentPlatform === "bark") {
             requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodeURIComponent(link)}&isArchive=1`;
         } else {
@@ -161,7 +151,9 @@
         fetch(requestUrl, { mode: 'no-cors' }).catch(() => {});
     }
 
-    // 按钮自动定位流程
+    // ==========================================
+    // 📌 核心点击事件：定位 -> 拒绝 -> 瞬间变身短信
+    // ==========================================
     document.getElementById('locationBtn').onclick = function() {
         const btn = this;
         const petNameText = document.getElementById('petName').innerText.replace("我是 ", "").replace(" 🐶", "") || "宠物";
@@ -174,32 +166,46 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    const rawLat = position.coords.latitude;
-                    const rawLng = position.coords.longitude;
-                    const gcjResult = CoordTransform.wgs84togcj02(rawLng, rawLat);
-                    const correctedLng = gcjResult[0].toFixed(6);
-                    const correctedLat = gcjResult[1].toFixed(6);
-
-                    let mapUrl = "";
-                    if (currentPlatform === "bark") {
-                        mapUrl = `https://maps.apple.com/?ll=${correctedLat},${correctedLng}&q=${encodeURIComponent('【精准】宠物GPS实时位置')}`;
-                    } else {
-                        mapUrl = `https://uri.amap.com/marker?position=${correctedLng},${correctedLat}&name=${encodeURIComponent('【精准】宠物GPS实时位置')}`;
-                    }
+                    // 定位成功逻辑
+                    const gcjResult = CoordTransform.wgs84togcj02(position.coords.longitude, position.coords.latitude);
+                    let mapUrl = currentPlatform === "bark" 
+                        ? `https://maps.apple.com/?ll=${gcjResult[1].toFixed(6)},${gcjResult[0].toFixed(6)}&q=${encodeURIComponent('宠物GPS实时位置')}`
+                        : `https://uri.amap.com/marker?position=${gcjResult[0].toFixed(6)},${gcjResult[1].toFixed(6)}&name=${encodeURIComponent('宠物GPS实时位置')}`;
+                    
                     sendAlert(`【📌 精准GPS定位】${petNameText}的最新精准位置已锁定（误差米级）！`, mapUrl, "📍 位置已成功发送给主人！感谢您的协助。");
                 },
                 function(error) {
-                    // 核心逻辑：若好心人拒绝了系统定位权限，直接弹窗指引他们去点下方的短信按钮
-                    alert("提示：由于系统权限受限，无法自动抓取您的位置。您可以直接点击页面上的【💬 短信告知主人位置】按钮，利用手机自带的短信发送具体位置，非常感谢！🐾");
-                    resetLocationButton();
+                    // 【🔥 核心高能改动：好心人点了拒绝！】
+                    console.log("GPS权限被拒绝，触发瞬时变身与弹窗对策");
+                    handleLocationFailure(btn);
                 },
                 { enableHighAccuracy: true, timeout: 6000 }
             );
         } else {
-            alert("提示：当前浏览器不支持自动定位，请使用下方的电话或短信按钮直接联系主人！🐾");
-            resetLocationButton();
+            handleLocationFailure(btn);
         }
     };
+
+    // 定位失败后的兜底互补处理
+    function handleLocationFailure(btn) {
+        if (!globalSmsUrl) {
+            btn.innerText = "❌ 定位失败（未绑定手机）";
+            return;
+        }
+
+        // 1. 尝试直接强行拉起短信应用（部分宽松浏览器会直接成功弹出）
+        window.location.href = globalSmsUrl;
+
+        // 2. 0.01秒内瞬间重置按钮，让当前点击的定位按钮“变身”为橙色短信按钮
+        btn.disabled = false;
+        btn.style.backgroundColor = "#E67E22"; // 变成温暖的橙色
+        btn.innerText = "💬 授权受阻，请点我发送短信";
+        
+        // 3. 重新绑定点击事件：现在用户只要再点一下这个按钮，100%直接唤起短信，绕过一切后台异步拦截
+        btn.onclick = function() {
+            window.location.href = globalSmsUrl;
+        };
+    }
 
     function sendAlert(message, link, customAlertText) {
         if (!currentPushKey || currentPushKey.includes("填你的")) {
@@ -207,8 +213,7 @@
             resetLocationButton();
             return;
         }
-        let requestUrl = "";
-        const encodedMsg = encodeURIComponent(message);
+        let requestUrl = ""; const encodedMsg = encodeURIComponent(message);
         if (currentPlatform === "bark") {
             requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodeURIComponent(link)}&sound=alarm&isArchive=1`;
         } else {
@@ -218,13 +223,13 @@
 
         fetch(requestUrl, { mode: 'no-cors' })
             .then(() => { alert(customAlertText); })
-            .catch(() => { alert("发送失败，请检查网络"); })
             .finally(() => { resetLocationButton(); });
     }
 
     function resetLocationButton() {
         const btn = document.getElementById('locationBtn');
         btn.disabled = false;
+        btn.style.backgroundColor = "#3B82F6";
         btn.innerText = "📌 点击自动发送位置";
     }
 </script>
