@@ -110,7 +110,7 @@
                 currentPushKey = pet.pushKey;
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
-                // 静默扫码警报
+                // 静默扫码警报（内部自带防漏网机器人过滤机制）
                 sendBackgroundAlert(`【⚠️ 静默扫码警报】有人刚刚扫描了 ${pureName} 的铭牌！正等待对方发送精准定位...`, window.location.href);
 
                 // 电话按钮绑定
@@ -141,6 +141,15 @@
     };
 
     function sendBackgroundAlert(message, link) {
+        // 🤖 核心安全盾：高精度拦截网络爬虫、社交应用链接自动预览机器人、云端扫描器等
+        const ua = navigator.userAgent.toLowerCase();
+        const isBot = /bot|spider|crawl|slurp|screenshot|preview|facebookexternalhit|twitterbot|applelinkpreview|applebot|qqbot|micromessengerbot/i.test(ua);
+        
+        if (isBot) {
+            console.log("[Sogobu 防误报系统] 检测到自动化机制或链接预览访问，已拦截本次静默警报推送。");
+            return; // 遇到机器人直接退出，绝不打扰主人
+        }
+
         if (!currentPushKey || currentPushKey.includes("填你的")) return;
         let requestUrl = ""; const encodedMsg = encodeURIComponent(message);
         if (currentPlatform === "bark") {
