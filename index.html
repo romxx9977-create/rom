@@ -110,12 +110,12 @@
                 currentPushKey = pet.pushKey || "";
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
-                // 🧠 智能纠错：如果 pushKey 包含 | 符号，自动修正为 wxpusher 模式
+                // 🧠 自动智能判别 WxPusher 模式
                 if (currentPushKey.includes("|")) {
                     currentPlatform = "wxpusher";
                 }
 
-                // 触发静默扫码警报
+                // 触发扫码静默警报
                 sendNotification(`【⚠️ 静默扫码警报】有人刚刚扫描了 ${pureName} 的铭牌！正等待对方发送精准定位...`, window.location.href);
 
                 // 电话按钮绑定
@@ -146,28 +146,58 @@
     };
 
     // ==========================================
-    // 📡 强效底层网络发送器（使用零拦截的 Image 对象）
+    // 📡 强效底层网络发送器（WxPusher 原生 POST 模式）
     // ==========================================
     function sendNotification(message, link, customAlert = null) {
         if (!currentPushKey || currentPushKey.includes("填你的")) return;
 
-        let requestUrl = "";
-        
         if (currentPlatform === "wxpusher" || currentPushKey.includes("|")) {
             const parts = currentPushKey.split("|");
             if (parts.length === 2) {
-                const appToken = parts[0];
-                const uid = parts[1];
+                const appToken = parts[0].trim();
+                const uid = parts[1].trim();
+
                 let content = message;
                 if (customAlert) {
                     content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击上方时间旁的“查看链接”跳转高德地图导航。`;
                 }
-                requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${appToken}&uids=${uid}&content=${encodeURIComponent(content)}&url=${encodeURIComponent(link)}`;
+
+                // 使用 WxPusher 官方推荐的标准 POST 接口（全平台跨域无拦截）
+                fetch("https://wxpusher.zjiecode.com/api/send/message", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        appToken: appToken,
+                        content: content,
+                        contentType: 1,
+                        uids: [uid],
+                        url: link
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    console.log("WxPusher 发送结果:", data);
+                    if (data.code !== 1000) {
+                        console.error("WxPusher 报错原因:", data.msg);
+                    }
+                    if (customAlert) {
+                        alert(customAlert);
+                    }
+                })
+                .catch(err => {
+                    console.error("网络请求异常:", err);
+                    if (customAlert) alert(customAlert);
+                });
+                return;
             } else {
                 alert("密钥格式不正确，WxPusher 要求填入: appToken|UID");
                 return;
             }
-        } else if (currentPlatform === "bark") {
+        }
+
+        // Bark / PushDeer 备用逻辑
+        let requestUrl = "";
+        if (currentPlatform === "bark") {
             requestUrl = `https://api.day.app/${currentPushKey}/${encodeURIComponent(message)}?url=${encodeURIComponent(link)}&sound=alarm&isArchive=1`;
         } else {
             const markdownDesp = `### 📍 宠物精准位置\n\n[🗺️ 点击这里直接打开地图导航](${link})`;
@@ -175,13 +205,11 @@
         }
 
         if (requestUrl) {
-            // 使用 Image 对象跨域无阻碍发起请求，绕过 fetch 的 CORS 屏蔽
-            const imgPing = new Image();
-            imgPing.src = requestUrl;
-
-            if (customAlert) {
-                alert(customAlert);
-            }
+            fetch(requestUrl, { mode: 'no-cors' }).then(() => {
+                if (customAlert) alert(customAlert);
+            }).catch(() => {
+                if (customAlert) alert(customAlert);
+            });
         }
     }
 
