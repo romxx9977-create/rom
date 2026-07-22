@@ -160,8 +160,8 @@
             // WxPusher 独占逻辑：拆分提取 appToken 和 UID
             const parts = currentPushKey.split("|");
             if(parts.length === 2) {
-                // 利用 WxPusher 官方接口，在微信消息底部增加“查看详情”直接拉起当前网页
-                requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uid=${parts[1]}&content=${encodedMsg}&url=${encodeURIComponent(link)}`;
+                // 注意这里修正了 uids，确保平台能正确识别接收人
+                requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uids=${parts[1]}&content=${encodedMsg}&url=${encodeURIComponent(link)}`;
             }
         } else {
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}&desp=${encodeURIComponent(`[🔗 点击打开网页](${link})`)}&type=markdown`;
@@ -186,7 +186,9 @@
             navigator.geolocation.getCurrentPosition(
                 function(position) {
                     const gcjResult = CoordTransform.wgs84togcj02(position.coords.longitude, position.coords.latitude);
-                    let mapUrl = (currentPlatform === "bark" || currentPlatform === "wxpusher") 
+                    
+                    // 已修改：除了 bark，wxpusher 和 pushdeer 统统使用高德地图
+                    let mapUrl = (currentPlatform === "bark") 
                         ? `https://maps.apple.com/?ll=${gcjResult[1].toFixed(6)},${gcjResult[0].toFixed(6)}&q=${encodeURIComponent('宠物GPS实时位置')}`
                         : `https://uri.amap.com/marker?position=${gcjResult[0].toFixed(6)},${gcjResult[1].toFixed(6)}&name=${encodeURIComponent('宠物GPS实时位置')}`;
                     
@@ -236,8 +238,9 @@
                 resetLocationButton();
                 return;
             }
-            const content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击下方“查看详情”跳转地图导航。`;
-            requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uid=${parts[1]}&content=${encodeURIComponent(content)}&url=${encodeURIComponent(link)}`;
+            const content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击下方“查看详情”跳转高德地图导航。`;
+            // 注意这里修正了 uids，确保平台能正确识别接收人
+            requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uids=${parts[1]}&content=${encodeURIComponent(content)}&url=${encodeURIComponent(link)}`;
         } else {
             const markdownDesp = `### 📍 宠物精准位置\n\n[🗺️ 点击这里直接打开地图导航](${link})`;
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}&desp=${encodeURIComponent(markdownDesp)}&type=markdown`;
