@@ -238,8 +238,7 @@
                 resetLocationButton();
                 return;
             }
-            // 🐶 已修正：文本指引更改为上方时间旁的“查看链接”
-            const content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击上方时间旁的“查看链接”跳转高德地图导航。`;
+            const content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击下方“查看详情”跳转高德地图导航。`;
             // 注意这里修正了 uids，确保平台能正确识别接收人
             requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uids=${parts[1]}&content=${encodeURIComponent(content)}&url=${encodeURIComponent(link)}`;
         } else {
