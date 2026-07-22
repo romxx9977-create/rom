@@ -110,7 +110,7 @@
                 currentPushKey = pet.pushKey;
                 currentPlatform = pet.platform ? pet.platform.toLowerCase() : "pushdeer";
 
-                // 静默扫码警报（内部自带防漏网机器人过滤机制）
+                // 静默扫码警报
                 sendBackgroundAlert(`【⚠️ 静默扫码警报】有人刚刚扫描了 ${pureName} 的铭牌！正等待对方发送精准定位...`, window.location.href);
 
                 // 电话按钮绑定
@@ -123,7 +123,7 @@
                     }
                 };
 
-                // 在线预研：智能适配 iOS 和安卓的短信唤起字串
+                // 短信备用逻辑
                 if (pet.phone && pet.phone !== "1XXXXXXXXXX") {
                     const smsBody = `你好，我刚扫了狗牌，捡到了您的宠物【${pureName}】，我目前所在的位置大概在：`;
                     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -141,23 +141,33 @@
     };
 
     function sendBackgroundAlert(message, link) {
-        // 🤖 核心安全盾：高精度拦截网络爬虫、社交应用链接自动预览机器人、云端扫描器等
         const ua = navigator.userAgent.toLowerCase();
         const isBot = /bot|spider|crawl|slurp|screenshot|preview|facebookexternalhit|twitterbot|applelinkpreview|applebot|qqbot|micromessengerbot/i.test(ua);
         
         if (isBot) {
-            console.log("[Sogobu 防误报系统] 检测到自动化机制或链接预览访问，已拦截本次静默警报推送。");
-            return; // 遇到机器人直接退出，绝不打扰主人
+            console.log("[Sogobu 防误报系统] 拦截机器人访问。");
+            return; 
         }
 
         if (!currentPushKey || currentPushKey.includes("填你的")) return;
-        let requestUrl = ""; const encodedMsg = encodeURIComponent(message);
+        
+        let requestUrl = ""; 
+        const encodedMsg = encodeURIComponent(message);
+        
         if (currentPlatform === "bark") {
             requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodeURIComponent(link)}&isArchive=1`;
+        } else if (currentPlatform === "wxpusher") {
+            // WxPusher 独占逻辑：拆分提取 appToken 和 UID
+            const parts = currentPushKey.split("|");
+            if(parts.length === 2) {
+                // 利用 WxPusher 官方接口，在微信消息底部增加“查看详情”直接拉起当前网页
+                requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uid=${parts[1]}&content=${encodedMsg}&url=${encodeURIComponent(link)}`;
+            }
         } else {
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}&desp=${encodeURIComponent(`[🔗 点击打开网页](${link})`)}&type=markdown`;
         }
-        fetch(requestUrl, { mode: 'no-cors' }).catch(() => {});
+        
+        if(requestUrl) fetch(requestUrl, { mode: 'no-cors' }).catch(() => {});
     }
 
     // ==========================================
@@ -175,16 +185,14 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    // 定位成功逻辑
                     const gcjResult = CoordTransform.wgs84togcj02(position.coords.longitude, position.coords.latitude);
-                    let mapUrl = currentPlatform === "bark" 
+                    let mapUrl = (currentPlatform === "bark" || currentPlatform === "wxpusher") 
                         ? `https://maps.apple.com/?ll=${gcjResult[1].toFixed(6)},${gcjResult[0].toFixed(6)}&q=${encodeURIComponent('宠物GPS实时位置')}`
                         : `https://uri.amap.com/marker?position=${gcjResult[0].toFixed(6)},${gcjResult[1].toFixed(6)}&name=${encodeURIComponent('宠物GPS实时位置')}`;
                     
                     sendAlert(`【📌 精准GPS定位】${petNameText}的最新精准位置已锁定（误差米级）！`, mapUrl, "📍 位置已成功发送给主人！感谢您的协助。");
                 },
                 function(error) {
-                    // 【🔥 核心高能改动：好心人点了拒绝！】
                     console.log("GPS权限被拒绝，触发瞬时变身与弹窗对策");
                     handleLocationFailure(btn);
                 },
@@ -195,22 +203,15 @@
         }
     };
 
-    // 定位失败后的兜底互补处理
     function handleLocationFailure(btn) {
         if (!globalSmsUrl) {
             btn.innerText = "❌ 定位失败（未绑定手机）";
             return;
         }
-
-        // 1. 尝试直接强行拉起短信应用（部分宽松浏览器会直接成功弹出）
         window.location.href = globalSmsUrl;
-
-        // 2. 0.01秒内瞬间重置按钮，让当前点击的定位按钮“变身”为橙色短信按钮
         btn.disabled = false;
-        btn.style.backgroundColor = "#E67E22"; // 变成温暖的橙色
+        btn.style.backgroundColor = "#E67E22"; 
         btn.innerText = "💬 授权受阻，请点我发送短信";
-        
-        // 3. 重新绑定点击事件：现在用户只要再点一下这个按钮，100%直接唤起短信，绕过一切后台异步拦截
         btn.onclick = function() {
             window.location.href = globalSmsUrl;
         };
@@ -222,17 +223,31 @@
             resetLocationButton();
             return;
         }
-        let requestUrl = ""; const encodedMsg = encodeURIComponent(message);
+        
+        let requestUrl = ""; 
+        const encodedMsg = encodeURIComponent(message);
+        
         if (currentPlatform === "bark") {
             requestUrl = `https://api.day.app/${currentPushKey}/${encodedMsg}?url=${encodeURIComponent(link)}&sound=alarm&isArchive=1`;
+        } else if (currentPlatform === "wxpusher") {
+            const parts = currentPushKey.split("|");
+            if(parts.length !== 2) {
+                alert("WxPusher 密钥格式错误，请在数据中填入 appToken|UID");
+                resetLocationButton();
+                return;
+            }
+            const content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击下方“查看详情”跳转地图导航。`;
+            requestUrl = `https://wxpusher.zjiecode.com/api/send/message/?appToken=${parts[0]}&uid=${parts[1]}&content=${encodeURIComponent(content)}&url=${encodeURIComponent(link)}`;
         } else {
             const markdownDesp = `### 📍 宠物精准位置\n\n[🗺️ 点击这里直接打开地图导航](${link})`;
             requestUrl = `https://api2.pushdeer.com/message/push?pushkey=${currentPushKey}&text=${encodedMsg}&desp=${encodeURIComponent(markdownDesp)}&type=markdown`;
         }
 
-        fetch(requestUrl, { mode: 'no-cors' })
-            .then(() => { alert(customAlertText); })
-            .finally(() => { resetLocationButton(); });
+        if(requestUrl) {
+            fetch(requestUrl, { mode: 'no-cors' })
+                .then(() => { alert(customAlertText); })
+                .finally(() => { resetLocationButton(); });
+        }
     }
 
     function resetLocationButton() {
