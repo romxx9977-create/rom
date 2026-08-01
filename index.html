@@ -103,7 +103,11 @@
 
             if (pet) {
                 const pureName = pet.name || "小宝贝";
-                document.getElementById('petName').innerText = `我是 ${pureName} 🐶`;
+                
+                // 💡 这里就是默认小狗的逻辑：如果没写type或者填的其他东西，全都默认是狗 🐶，只有写了猫才会变 🐱
+                const petEmoji = (pet.type === "猫" || pet.type === "cat" || pet.type === "猫咪") ? "🐱" : "🐶";
+                document.getElementById('petName').innerText = `我是 ${pureName} ${petEmoji}`;
+
                 if (pet.photo && pet.photo !== "宠物的照片链接") {
                     document.getElementById('petPhoto').src = pet.photo;
                 }
@@ -162,7 +166,6 @@
                     content = `📍 宠物精准位置通知\n\n${message}\n\n👉 请点击上方时间旁的“查看链接”跳转高德地图导航。`;
                 }
 
-                // 使用 WxPusher 官方推荐的标准 POST 接口（全平台跨域无拦截）
                 fetch("https://wxpusher.zjiecode.com/api/send/message", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -218,7 +221,8 @@
     // ==========================================
     document.getElementById('locationBtn').onclick = function() {
         const btn = this;
-        const petNameText = document.getElementById('petName').innerText.replace("我是 ", "").replace(" 🐶", "") || "宠物";
+        // 🔄 优化提取名字逻辑：自动过滤掉 🐶 或 🐱，防止推送到手机上的名字里带乱码图标
+        const petNameText = document.getElementById('petName').innerText.replace("我是 ", "").replace(/ 🐶| 🐱/g, "") || "宠物";
 
         alert(`【🌟 寻宠求助】\n为了帮小动物精准回家，接下来系统会询问“是否允许获取位置”，请务必点击『允许』或『好』。感谢您的善举！🐾`);
 
